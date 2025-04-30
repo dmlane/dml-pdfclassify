@@ -1,0 +1,20 @@
+class Pdfclassify < Formula
+  include Language::Python::Virtualenv
+
+  desc "PDF classifier based on content etc"
+  homepage "https://github.com/dmlane/pdfclassify"
+  url "#URL#"
+  sha256 "#SHA256#"
+  license "MIT"
+
+  depends_on "python@3.11"
+
+  def install
+    virtualenv_install_with_resources
+  end
+  #---START-RESOURCES---
+  #---END-RESOURCES---
+  test do
+    system "#{bin}/pdfclassify", "--version"
+  end
+end
