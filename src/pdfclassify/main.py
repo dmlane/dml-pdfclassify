@@ -1,15 +1,26 @@
-""" Main entry point for pdfclassify """
+"""Main entry point for pdfclassify"""
+
 import argparse
-from importlib.metadata import version
 import sys
+from importlib.metadata import version
+from pathlib import Path
 
 from pdfclassify._util import MyException, RawFormatter
+from pdfclassify.pdf_semantic_classifier import PDFSemanticClassifier
+
+HOME = Path.home()
+CLOUD_DIR = HOME / "Library/Mobile Documents/com~apple~CloudDocs/net.dmlane/pdfclassify"
+
 
 class Pdfclassify:
-    """ Main class """
+    """Main class"""
+
     parser = None
-    version=None
-    verbose=False
+    version = None
+    verbose = False
+    input_file = None
+    data_dir = None
+    output_path = None
 
     def __init__(self):
         pass
@@ -34,17 +45,48 @@ class Pdfclassify:
             default=False,
             help="Verbose output",
         )
- 
+        self.parser.add_argument(
+            "-d",
+            "--data-dir",
+            default=str(CLOUD_DIR / "training_data"),
+            help="Path to the directory containing the training data",
+        )
+
+        self.parser.add_argument(
+            "-o",
+            "--output-path",
+            default=str(CLOUD_DIR / "output"),
+            help="Path to save the labelled file",
+        )
+        self.parser.add_argument(
+            "input_file",
+            help="Input PDF file to classify",
+        )
+
     def parse_args(self):
         """Parse the command line arguments"""
         args = self.parser.parse_args()
 
         self.verbose = args.verbose
- 
+        self.input_file = args.input_file
+        self.data_dir = args.data_dir
+        self.output_path = args.output_path
+        if self.input_file is None:
+            raise MyException("Input file is required", 1)
+
     def run(self):
-        """ Main entry point """
+        """Main entry point"""
         self.make_cmd_line_parser()
         self.parse_args()
+
+        classifier = PDFSemanticClassifier(data_dir=self.data_dir)
+        classifier.train()
+        label = classifier.predict(
+            pdf_path=self.input_file,
+            confidence_threshold=0.7,
+        )
+        print(f"Predicted label: {label}")
+
 
 def main():
     """Main entry point"""
@@ -53,6 +95,7 @@ def main():
     except MyException as e:
         print(e.msg)
         sys.exit(1)
+
 
 if __name__ == "__main__":
     main()

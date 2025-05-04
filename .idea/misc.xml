@@ -3,7 +3,7 @@
   <component name="Black">
     <option name="enabledOnSave" value="true" />
     <option name="pathToExecutable" value="$USER_HOME$/.pyenv/shims/black" />
-    <option name="sdkName" value="Python 3.11 (pdfclassify)" />
+    <option name="sdkName" value="Python 3.12 virtualenv at ~/.pyenv/versions/pdfclassify" />
   </component>
-  <component name="ProjectRootManager" version="2" project-jdk-name="Python 3.11 (pdfclassify)" project-jdk-type="Python SDK" />
+  <component name="ProjectRootManager" version="2" project-jdk-name="Python 3.12 virtualenv at ~/.pyenv/versions/pdfclassify" project-jdk-type="Python SDK" />
 </project>

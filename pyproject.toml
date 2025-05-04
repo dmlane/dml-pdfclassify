@@ -17,7 +17,13 @@ packages = [
 ]
 
 [tool.poetry.dependencies]
-python = ">=3.11,<4"
+python = "^3.11"
+sentence-transformers = "^4.1.0"
+pdfminer-six = "^20250416"
+joblib = "^1.4.2"
+numpy = "^2.2.5"
+platformdirs = "^4.3.7"
+
 
 [tool.poetry.group.docs]
 optional = true
@@ -70,7 +76,7 @@ push = true
 
 [tool.black]
 line_length = 100
-target-version = ['py311']
+target-version = ['py312']
 
 [tool.isort]
 profile = "black"
