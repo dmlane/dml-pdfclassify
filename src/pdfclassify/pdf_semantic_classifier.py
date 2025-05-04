@@ -10,7 +10,8 @@ Embeddings for each PDF file are persisted individually for incremental training
 
 import hashlib
 import json
-from datetime import datetime
+import logging
+from logging.handlers import TimedRotatingFileHandler
 from pathlib import Path
 from typing import List
 
@@ -21,29 +22,51 @@ from pdfminer.high_level import extract_text
 from platformdirs import user_cache_dir, user_log_dir
 from sentence_transformers import SentenceTransformer
 
+ORGANISATION = "net.dmlane"
+APP_NAME = "pdfclassify"
+
+
+def get_logger(app_name=APP_NAME, org_name=ORGANISATION, filename="retrain.log") -> logging.Logger:
+    """Create a weekly rotating file logger in the macOS standard log location (rotates Sunday at midnight)."""
+    log_dir = Path(user_log_dir())
+    log_dir = log_dir / org_name / app_name
+    log_dir.mkdir(parents=True, exist_ok=True)
+    log_path = log_dir / filename
+
+    logger = logging.getLogger(app_name)
+    if not logger.handlers:
+        handler = TimedRotatingFileHandler(
+            log_path,
+            when="W0",  # Rotate every week on Sunday at midnight
+            interval=1,
+            backupCount=5,
+            encoding="utf-8",
+        )
+        formatter = logging.Formatter("[%(asctime)s] %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
+        handler.setFormatter(formatter)
+        logger.addHandler(handler)
+        logger.setLevel(logging.INFO)
+        logger.propagate = False
+
+    return logger
+
 
 class PDFSemanticClassifier:
     """Multilingual embedding-based PDF classifier (DEVONthink-style)."""
 
     # pylint: disable=too-many-instance-attributes
-    def _log(self, message: str) -> None:
-        """Append a timestamped message to the retrain log."""
-        with open(self.log_path, "a", encoding="utf-8") as log:
-            log.write(f"[{datetime.now().isoformat()}] {message}\n")
-
     def __init__(self, data_dir: str, cache_name: str = "semantic_pdf_classifier"):
         self.data_dir = Path(data_dir)
-        self.cache_dir = Path(user_cache_dir("net.dmlane.pdf_classifier"), cache_name)
+        self.cache_dir = Path(user_cache_dir())
+        self.cache_dir = self.cache_dir / ORGANISATION / APP_NAME / cache_name
         self.cache_dir.mkdir(parents=True, exist_ok=True)
-
-        self.log_dir = Path(user_log_dir("pdfclassify", "net.dmlane"))
-        self.log_dir.mkdir(parents=True, exist_ok=True)
 
         self.model_path = self.cache_dir / "model.joblib"
         self.hash_path = self.cache_dir / "file_hashes.json"
         self.embeddings_dir = self.cache_dir / "embeddings"
         self.embeddings_dir.mkdir(exist_ok=True)
-        self.log_path = self.log_dir / "retrain.log"
+
+        self.logger = get_logger()
 
         self.documents: List[str] = []
         self.labels: List[str] = []
@@ -65,7 +88,7 @@ class PDFSemanticClassifier:
                     hash_md5.update(chunk)
             hash_md5.update(str(path.stat().st_mtime).encode())
         except Exception as exc:
-            self._log(f"Failed to compute hash for {path}: {exc}")
+            self.logger.warning("Failed to compute hash for %s: %s", path, exc)
         return hash_md5.hexdigest()
 
     def _embedding_path(self, file_path: str) -> Path:
@@ -98,9 +121,9 @@ class PDFSemanticClassifier:
                         if text.strip():
                             vec = self.embedder.encode([text], convert_to_numpy=True)[0]
                             joblib.dump((vec, label), embedding_path)
-                            self._log(f"Updated embedding: {pdf_file}")
+                            self.logger.info("Updated embedding: %s", pdf_file)
                     except Exception as exc:
-                        self._log(f"Failed to embed {pdf_file}: {exc}")
+                        self.logger.warning("Failed to embed %s: %s", pdf_file, exc)
 
                 if embedding_path.exists():
                     try:
@@ -108,11 +131,11 @@ class PDFSemanticClassifier:
                         embeddings.append(vec)
                         labels.append(lbl)
                     except Exception as exc:
-                        self._log(f"Failed to load embedding {embedding_path}: {exc}")
+                        self.logger.warning("Failed to load embedding %s: %s", embedding_path, exc)
 
         deleted_files = set(previous_hashes.keys()) - all_current_files
         for deleted_path in deleted_files:
-            self._log(f"Removed: {deleted_path}")
+            self.logger.info("Removed: %s", deleted_path)
             deleted_embedding = self._embedding_path(deleted_path)
             if deleted_embedding.exists():
                 deleted_embedding.unlink()
@@ -125,11 +148,11 @@ class PDFSemanticClassifier:
         """Train or update the model from persistent embeddings. Also prune empty label directories."""
         for label_dir in self.data_dir.iterdir():
             if label_dir.is_dir() and not any(label_dir.glob("*.pdf")):
-                self._log(f"Pruning empty label directory: {label_dir}")
+                self.logger.info("Pruning empty label directory: %s", label_dir)
                 try:
                     label_dir.rmdir()
                 except Exception as exc:
-                    self._log(f"Failed to remove {label_dir}: {exc}")
+                    self.logger.warning("Failed to remove %s: %s", label_dir, exc)
 
         previous_hashes = {}
         if self.hash_path.exists():
@@ -139,13 +162,13 @@ class PDFSemanticClassifier:
         updated_hashes = self._load_data(previous_hashes)
 
         if self.doc_vectors is None or not self.labels:
-            self._log("No valid data to train the model.")
+            self.logger.info("No valid data to train the model.")
             return
 
         joblib.dump((self.doc_vectors, self.labels), self.model_path)
         with open(self.hash_path, "w", encoding="utf-8") as f:
             json.dump(updated_hashes, f)
-        self._log(f"Model trained and saved with {len(self.labels)} documents.")
+        self.logger.info("Model trained and saved with %d documents.", len(self.labels))
 
     def _load_cached_model(self) -> None:
         """Load embedding vectors and labels from disk."""
@@ -153,17 +176,19 @@ class PDFSemanticClassifier:
 
     def predict(self, pdf_path: str, confidence_threshold: float = 0.5) -> str:
         """Predict the label for a PDF based on cosine similarity."""
-        self._log(f"Predicting label for {pdf_path} with threshold {confidence_threshold}")
+        self.logger.info(
+            "Predicting label for %s with threshold %.2f", pdf_path, confidence_threshold
+        )
 
         # Automatically retrain if needed
         if not self.model_path.exists() or not self.hash_path.exists():
-            self._log("Model or hash file missing — triggering train().")
+            self.logger.info("Model or hash file missing — triggering train().")
             self.train()
         elif self.doc_vectors is None or not self.labels:
             try:
                 self._load_cached_model()
             except Exception as exc:
-                self._log(f"Failed to load cached model: {exc}. Retraining.")
+                self.logger.warning("Failed to load cached model: %s. Retraining.", exc)
                 self.train()
 
         if self.doc_vectors is None:
@@ -182,9 +207,12 @@ class PDFSemanticClassifier:
         best_index = np.argmax(sims)
         best_score = sims[best_index]
         if best_score < confidence_threshold:
-            pct_label = "__uncertain__" + self.labels[best_index] + f"({best_score:.3f})"
-            self._log(f"Prediction below threshold: score={best_score:.3f}, assigned={pct_label}")
-            return pct_label
+            self.logger.info(
+                "Prediction below threshold: score=%.3f, assigned=__uncertain__", best_score
+            )
+            return "__uncertain__"
         predicted_label = self.labels[best_index]
-        self._log(f"Prediction above threshold: score={best_score:.3f}, assigned={predicted_label}")
+        self.logger.info(
+            "Prediction above threshold: score=%.3f, assigned=%s", best_score, predicted_label
+        )
         return predicted_label
