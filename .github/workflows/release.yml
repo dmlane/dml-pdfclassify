@@ -48,7 +48,7 @@ jobs:
       - name: Build .pyz with shiv
         run: |
           mkdir -p dist
-          shiv -e ${{ env.TOOL_NAME }}.cli:main -r requirements.txt . \
+          shiv -e ${{ env.TOOL_NAME }}.main:main -r requirements.txt . \
                -o dist/${{ env.TOOL_NAME }}-${{ steps.extract_version.outputs.version }}.pyz
 
       - name: Upload .pyz to GitHub Release
