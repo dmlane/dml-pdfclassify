@@ -29,7 +29,11 @@ else:
     from sentence_transformers import SentenceTransformer
 
 if sys.version_info[:2] != (3, 12):
-    print("pdfclassify requires Python 3.12")
+    print(
+        "pdfclassify requires Python 3.12 currently, but found Python "
+        + f"{sys.version_info[0]}.{sys.version_info[1]}."
+    )
+
     sys.exit(1)
 
 ORGANISATION = "net.dmlane"
