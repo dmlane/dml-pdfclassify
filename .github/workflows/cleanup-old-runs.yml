@@ -25,9 +25,13 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.HOMEBREW_TAP_PAT }}
         run: |
+          export GITHUB_TOKEN="${GH_TOKEN}"  # Just in case
           REPO="${{ github.repository }}"
           echo "Cleaning up workflow runs for $REPO older than 30 days..."
-          gh auth status
+          gh auth status || {
+            echo "GitHub CLI not authenticated. Exiting."
+            exit 1
+          }
           gh run list --repo "$REPO" --limit 1000 --json databaseId,createdAt,status | \
             jq -c '.[] | select(.status != "in_progress" and (.createdAt | fromdateiso8601 < (now - 30*86400))) | .databaseId' | \
             xargs -r -I % gh run delete % --repo "$REPO" --yes
