@@ -1,12 +1,21 @@
 """Main entry point for pdfclassify"""
 
-import argparse
 import sys
-from importlib.metadata import version
-from pathlib import Path
 
-from pdfclassify._util import MyException, RawFormatter
-from pdfclassify.pdf_semantic_classifier import PDFSemanticClassifier
+if sys.version_info[:2] != (3, 12):
+    print(
+        "pdfclassify requires Python 3.12 currently, but found Python "
+        + f"{sys.version_info[0]}.{sys.version_info[1]}."
+    )
+
+    sys.exit(1)
+else:
+    import argparse
+    from importlib.metadata import version
+    from pathlib import Path
+
+    from pdfclassify._util import MyException, RawFormatter
+    from pdfclassify.pdf_semantic_classifier import PDFSemanticClassifier
 
 HOME = Path.home()
 CLOUD_DIR = HOME / "Library/Mobile Documents/com~apple~CloudDocs/net.dmlane/pdfclassify"
