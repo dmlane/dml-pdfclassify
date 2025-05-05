@@ -1,0 +1,78 @@
+name: Release to GitHub & Homebrew
+
+on:
+  push:
+    tags:
+      - "v*"
+
+env:
+  TOOL_NAME: pdfclassify
+  PYTHON_VERSION: "3.12"
+  FORMULA_REPO: dmlane/homebrew-tap
+  FORMULA_PATH: Formula/pdfclassify.rb
+  GITHUB_OWNER: dmlane
+
+jobs:
+  build-release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        run: |
+          pip install poetry shiv
+
+      - name: Export dependencies
+        run: |
+          poetry export --without-hashes -f requirements.txt -o requirements.txt
+
+      - name: Extract version from tag
+        id: extract_version
+        run: |
+          echo "version=${GITHUB_REF#refs/tags/v}" >> "$GITHUB_OUTPUT"
+
+      - name: Build .pyz with shiv
+        run: |
+          mkdir -p dist
+          shiv -e ${{ env.TOOL_NAME }}.cli:main -r requirements.txt . \
+               -o dist/${{ env.TOOL_NAME }}-${{ steps.extract_version.outputs.version }}.pyz
+
+      - name: Upload .pyz to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/${{ env.TOOL_NAME }}-${{ steps.extract_version.outputs.version }}.pyz
+
+      - name: Compute SHA256 for Homebrew
+        id: compute_sha
+        run: |
+          FILENAME=dist/${{ env.TOOL_NAME }}-${{ steps.extract_version.outputs.version }}.pyz
+          SHA=$(shasum -a 256 "$FILENAME" | cut -d ' ' -f1)
+          echo "sha256=$SHA" >> "$GITHUB_OUTPUT"
+
+      - name: Update Homebrew Formula
+        env:
+          GH_TOKEN: ${{ secrets.HOMEBREW_TAP_PAT }}
+        run: |
+          VERSION=${{ steps.extract_version.outputs.version }}
+          FILE_NAME=${{ env.TOOL_NAME }}-${VERSION}.pyz
+          FORMULA_URL="https://github.com/${{ env.GITHUB_OWNER }}/${{ env.TOOL_NAME }}/releases/download/v${VERSION}/${FILE_NAME}"
+          SHA=${{ steps.compute_sha.outputs.sha256 }}
+
+          git clone https://github.com/${{ env.FORMULA_REPO }} tap
+          cd tap
+
+          sed -i "s|url \".*\"|url \"$FORMULA_URL\"|" "${{ env.FORMULA_PATH }}"
+          sed -i "s|sha256 \".*\"|sha256 \"$SHA\"|" "${{ env.FORMULA_PATH }}"
+
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git commit -am "Update formula to v$VERSION"
+          git push
+
