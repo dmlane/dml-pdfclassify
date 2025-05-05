@@ -62,6 +62,7 @@ jobs:
           VERSION=${{ steps.extract_version.outputs.version }}
           FILE_NAME=${{ env.TOOL_NAME }}-${VERSION}.pyz
           FORMULA_URL="https://github.com/${{ env.GITHUB_OWNER }}/${{ env.TOOL_NAME }}/releases/download/v${VERSION}/${FILE_NAME}"
+          echo "URL=$FORMULA_URL"
 
           for i in {1..10}; do
             curl -fsSL -o "$FILE_NAME" "$FORMULA_URL" && break
