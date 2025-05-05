@@ -23,7 +23,7 @@ jobs:
 
       - name: Authenticate and Delete Workflow Runs Older Than 30 Days
         env:
-          GH_TOKEN: ${{ secrets.GH_PAT_CLEANUP }}
+          GH_TOKEN: ${{ secrets.HOMEBREW_TAP_PAT }}
         run: |
           REPO="${{ github.repository }}"
           echo "Cleaning up workflow runs for $REPO older than 30 days..."
