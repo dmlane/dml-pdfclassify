@@ -1,6 +1,10 @@
 - name: Authenticate and Delete Workflow Runs Older Than 30 Days
   env:
     GH_TOKEN: ${{ secrets.HOMEBREW_TAP_PAT }}
+  on:
+    schedule:
+      - cron: '0 0 * * 0'  # Every Sunday at 00:00 UTC
+    workflow_dispatch:     # Allows manual runs from GitHub UI
   run: |
     REPO="${{ github.repository }}"
     echo "Cleaning up runs for $REPO older than 30 days..."
