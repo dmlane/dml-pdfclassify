@@ -68,8 +68,7 @@ jobs:
           GH_TOKEN: ${{ secrets.HOMEBREW_TAP_PAT }}
         run: |
           VERSION=${{ steps.extract_version.outputs.version }}
-          #FILE_NAME=${{ env.TOOL_NAME }}-${VERSION}.pyz
-          FILE_NAME=${{ env.TOOL_NAME }}.pyz
+          FILE_NAME=${{ env.TOOL_NAME }}-${VERSION}.pyz
           FORMULA_URL="https://github.com/${{ env.GITHUB_OWNER }}/${{ env.TOOL_NAME }}/releases/download/v${VERSION}/${FILE_NAME}"
           SHA=${{ steps.compute_sha.outputs.sha256 }}
 
