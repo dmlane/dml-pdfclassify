@@ -63,10 +63,10 @@ jobs:
           FILE_NAME=${{ env.TOOL_NAME }}-${VERSION}.pyz
           FORMULA_URL="https://github.com/${{ env.GITHUB_OWNER }}/${{ env.TOOL_NAME }}/releases/download/v${VERSION}/${FILE_NAME}"
 
-          for i in {1..5}; do
+          for i in {1..10}; do
             curl -fsSL -o "$FILE_NAME" "$FORMULA_URL" && break
             echo "Retrying download in 3s..."
-            sleep 3
+            sleep 5
           done
 
           sha256=$(shasum -a 256 "$FILE_NAME" | cut -d ' ' -f1)
