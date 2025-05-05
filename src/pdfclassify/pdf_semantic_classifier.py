@@ -11,6 +11,7 @@ Embeddings for each PDF file are persisted individually for incremental training
 import hashlib
 import json
 import logging
+import sys
 from logging.handlers import TimedRotatingFileHandler
 from pathlib import Path
 from typing import List
@@ -21,6 +22,10 @@ import torch
 from pdfminer.high_level import extract_text
 from platformdirs import user_cache_dir, user_log_dir
 from sentence_transformers import SentenceTransformer
+
+if sys.version_info[:2] != (3, 12):
+    print("pdfclassify requires Python 3.12")
+    sys.exit(1)
 
 ORGANISATION = "net.dmlane"
 APP_NAME = "pdfclassify"
