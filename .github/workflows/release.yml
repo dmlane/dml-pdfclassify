@@ -72,7 +72,8 @@ jobs:
           FORMULA_URL="https://github.com/${{ env.GITHUB_OWNER }}/${{ env.TOOL_NAME }}/releases/download/v${VERSION}/${FILE_NAME}"
           SHA=${{ steps.compute_sha.outputs.sha256 }}
 
-          git clone https://github.com/${{ env.FORMULA_REPO }} tap
+          git clone https://x-access-token:${{ secrets.HOMEBREW_TAP_PAT }}@github.com/${{ env.FORMULA_REPO }} tap
+
           cd tap
 
           sed -i '' "s|url \".*\"|url \"$FORMULA_URL\"|" "${{ env.FORMULA_PATH }}"
