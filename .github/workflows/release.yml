@@ -3,7 +3,7 @@ name: Release to GitHub & Homebrew
 on:
   push:
     tags:
-      - '[0-9][0-9][0-9][0-9].[0-9][0-9].[0-9][0-9][0-9][0-9]'  # Matches yyyy.mm.nnnn
+      - '[0-9][0-9][0-9][0-9].[0-9][0-9].[0-9][0-9][0-9]'  # Matches yyyy.mm.nnnn
 
 env:
   TOOL_NAME: pdfclassify
