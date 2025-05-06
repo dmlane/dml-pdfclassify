@@ -15,11 +15,9 @@ jobs:
     steps:
       - name: Set up GitHub CLI
         run: |
-          sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-key C99B11DEB97541F0
-          sudo apt-add-repository https://cli.github.com/packages
-          sudo apt update
-          sudo apt install gh -y
-
+          curl -fsSL -o gh.deb https://github.com/cli/cli/releases/latest/download/gh_$(curl -s https://api.github.com/repos/cli/cli/releases/latest | jq -r '.tag_name' | sed 's/^v//')_linux_amd64.deb
+          sudo dpkg -i gh.deb
+          gh --version
       - name: Authenticate and Delete old releases (keep 10 newest)
         env:
           GH_TOKEN: ${{ secrets.HOMEBREW_TAP_PAT }}
