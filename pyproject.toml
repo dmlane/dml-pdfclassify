@@ -61,12 +61,23 @@ requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
 
 [tool.bumpver]
-current_version = "2023.1.1000"
-version_pattern = "YYYY.MM.BUILD[-PYTAGNUM]"
+current_version = "2023.1.2"
+#version_pattern = "YYYY.MM.BUILD[-PYTAGNUM]"
+version_pattern = "YYYY.MM.BUILD"
 commit_message = "bump version {old_version} -> {new_version}"
 commit = true
 tag = true
 push = true
+
+[tool.bumpver.patterns]
+BUILD = "\\d+"
+
+[tool.bumpver.parts]
+YYYY.format = "%Y"
+MM.format = "%m"
+BUILD.format = "%d"
+BUILD.first = 1
+BUILD.reset_on_change = ["YYYY", "MM"]
 
 [tool.bumpver.file_patterns]
 "pyproject.toml" = [
