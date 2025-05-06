@@ -67,7 +67,7 @@ jobs:
           for i in {1..10}; do
             curl -fsSL -o "$FILE_NAME" "$FORMULA_URL" && break
             echo "Retrying download in 3s..."
-            sleep 5
+            sleep 3
           done
 
           sha256=$(shasum -a 256 "$FILE_NAME" | cut -d ' ' -f1)
@@ -84,6 +84,10 @@ jobs:
 
           git clone https://x-access-token:${{ secrets.HOMEBREW_TAP_PAT }}@github.com/${{ env.FORMULA_REPO }} tap
 
+          # If formula file doesn't exist in the tap, copy the skeleton from this repo
+          if [ ! -f "tap/${{ env.FORMULA_PATH }}" ]; then
+            cp .skel/formula.rb tap/${{ env.FORMULA_PATH }}
+          fi
           cd tap
 
           sed -i '' "s|url \".*\"|url \"$FORMULA_URL\"|" "${{ env.FORMULA_PATH }}"
