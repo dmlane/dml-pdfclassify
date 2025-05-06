@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "pdfclassify"
-version = "2025.5.1003"		# Published version is managed BY bumper
+version = "2025.5.1004"		# Published version is managed BY bumper
 description = "PDF classifier based on content etc"
 authors = ["Dave Lane <cheery.koala5370@fastmail.com>"]
 license = "MIT"
@@ -61,7 +61,7 @@ requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
 
 [tool.bumpver]
-current_version = "2025.5.1003"
+current_version = "2025.5.1004"
 #version_pattern = "YYYY.MM.BUILD[-PYTAGNUM]"
 version_pattern = "YYYY.MM.BUILD"
 commit_message = "bump version {old_version} -> {new_version}"
