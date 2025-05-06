@@ -3,7 +3,7 @@ name: Release to GitHub & Homebrew
 on:
   push:
     tags:
-      - "v*"
+      - '[0-9][0-9][0-9][0-9].[0-9][0-9].[0-9][0-9][0-9][0-9]'  # Matches yyyy.mm.nnnn
 
 env:
   TOOL_NAME: pdfclassify
@@ -43,7 +43,7 @@ jobs:
       - name: Extract version from tag
         id: extract_version
         run: |
-          echo "version=${GITHUB_REF#refs/tags/v}" >> "$GITHUB_OUTPUT"
+          echo "version=${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
 
       - name: Build .pyz with shiv
         run: |
@@ -61,7 +61,7 @@ jobs:
         run: |
           VERSION=${{ steps.extract_version.outputs.version }}
           FILE_NAME=${{ env.TOOL_NAME }}-${VERSION}.pyz
-          FORMULA_URL="https://github.com/${{ env.GITHUB_OWNER }}/${{ env.TOOL_NAME }}/releases/download/v${VERSION}/${FILE_NAME}"
+          FORMULA_URL="https://github.com/${{ env.GITHUB_OWNER }}/${{ env.TOOL_NAME }}/releases/download/${VERSION}/${FILE_NAME}"
           echo "URL=$FORMULA_URL"
 
           for i in {1..10}; do
@@ -79,7 +79,7 @@ jobs:
         run: |
           VERSION=${{ steps.extract_version.outputs.version }}
           FILE_NAME=${{ env.TOOL_NAME }}-${VERSION}.pyz
-          FORMULA_URL="https://github.com/${{ env.GITHUB_OWNER }}/${{ env.TOOL_NAME }}/releases/download/v${VERSION}/${FILE_NAME}"
+          FORMULA_URL="https://github.com/${{ env.GITHUB_OWNER }}/${{ env.TOOL_NAME }}/releases/download/${VERSION}/${FILE_NAME}"
           SHA=${{ steps.compute_sha.outputs.sha256 }}
 
           git clone https://x-access-token:${{ secrets.HOMEBREW_TAP_PAT }}@github.com/${{ env.FORMULA_REPO }} tap
@@ -91,6 +91,6 @@ jobs:
 
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
-          git commit -am "Update formula to v$VERSION"
+          git commit -am "Update formula to ${VERSION}"
           git push
 

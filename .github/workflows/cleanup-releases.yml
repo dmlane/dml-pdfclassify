@@ -1,0 +1,35 @@
+name: Cleanup Old Releases
+
+on:
+  schedule:
+    - cron: '0 0 * * 6'  # Every Saturday at midnight UTC
+  workflow_dispatch:     # Allow manual runs too
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+
+      - name: Set up GitHub CLI
+        uses: cli/cli-action@v2
+
+      - name: Authenticate and Delete old releases (keep 10 newest)
+        env:
+          GH_TOKEN: ${{ secrets.HOMEBREW_TAP_PAT }}
+        run: |
+          export GITHUB_TOKEN="${GH_TOKEN}"  # Just in case
+          gh auth status || {
+            echo "GitHub CLI not authenticated. Exiting."
+            exit 1
+          }
+          gh release list --limit 100 | awk '{print $1}' | tail -n +11 | while read tag; do
+            echo "Deleting release: $tag"
+            gh release delete "$tag" --yes
+          done
+
