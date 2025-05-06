@@ -9,7 +9,7 @@ env:
   TOOL_NAME: pdfclassify
   PYTHON_VERSION: "3.12"
   FORMULA_REPO: dmlane/homebrew-tap
-  FORMULA_PATH: Formula/pdfclassify.rb
+  FORMULA_PATH: Formula/dml-pdfclassify.rb
   GITHUB_OWNER: dmlane
 
 jobs:
