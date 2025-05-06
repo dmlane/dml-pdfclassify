@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "pdfclassify"
-version = "2025.5.6"		# Published version is managed BY bumper
+version = "2025.5.7"		# Published version is managed BY bumper
 description = "PDF classifier based on content etc"
 authors = ["Dave Lane <cheery.koala5370@fastmail.com>"]
 license = "MIT"
