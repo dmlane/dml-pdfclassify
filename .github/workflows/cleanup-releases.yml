@@ -3,7 +3,7 @@ name: Cleanup Old Releases
 on:
   schedule:
     - cron: '0 0 * * 6'  # Every Saturday at midnight UTC
-  workflow_dispatch:     # Allow manual runs too
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -12,25 +12,64 @@ jobs:
   cleanup:
     runs-on: ubuntu-latest
 
+    env:
+      KEEP_RELEASES: 5  # 🔧 Number of releases to keep
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
       - name: Set up GitHub CLI
         run: |
-          curl -fsSL -o gh.deb https://github.com/cli/cli/releases/latest/download/gh_$(curl -s https://api.github.com/repos/cli/cli/releases/latest | jq -r '.tag_name' | sed 's/^v//')_linux_amd64.deb
-          sudo dpkg -i gh.deb
+          echo "Downloading GitHub CLI..."
+          curl -fsSL -o gh.deb https://github.com/cli/cli/releases/latest/download/gh_$(curl -s https://api.github.com/repos/cli/cli/releases/latest | jq -r '.tag_name' | sed 's/^v//')_linux_amd64.deb || {
+            echo "Failed to download GitHub CLI."
+            exit 1
+          }
+
+          echo "Installing GitHub CLI..."
+          sudo dpkg -i gh.deb || {
+            echo "Failed to install GitHub CLI."
+            exit 1
+          }
+
           gh --version
-      - name: Authenticate and Delete old releases (keep 10 newest)
+
+      - name: Authenticate and delete old releases
         env:
           GH_TOKEN: ${{ secrets.HOMEBREW_TAP_PAT }}
         run: |
-          export GITHUB_TOKEN="${GH_TOKEN}"  # Just in case
-          gh auth status || {
-            echo "GitHub CLI not authenticated. Exiting."
+          export GITHUB_TOKEN="${GH_TOKEN}"
+
+          echo "Checking GitHub CLI authentication..."
+          if ! gh auth status > /dev/null 2>&1; then
+            echo "GitHub CLI is not authenticated. Exiting."
             exit 1
-          }
-          gh release list --limit 100 | awk '{print $1}' | tail -n +11 | while read tag; do
-            echo "Deleting release: $tag"
-            gh release delete "$tag" --yes
+          fi
+
+          echo "Fetching releases..."
+          RELEASES=$(gh release list --limit 100 2>/dev/null | awk '{print $1}')
+          if [ -z "$RELEASES" ]; then
+            echo "No releases found or failed to list releases."
+            exit 0
+          fi
+
+          DELETE_COUNT=$(echo "$RELEASES" | wc -l)
+          DELETE_COUNT=$((DELETE_COUNT - KEEP_RELEASES))
+
+          if [ "$DELETE_COUNT" -le 0 ]; then
+            echo "No old releases to delete. Keeping latest $KEEP_RELEASES."
+            exit 0
+          fi
+
+          echo "$RELEASES" | tail -n +"$((KEEP_RELEASES + 1))" | while read -r tag; do
+            if [ -n "$tag" ]; then
+              echo "Deleting release: $tag"
+              if ! gh release delete "$tag" --yes; then
+                echo "⚠️ Failed to delete release: $tag"
+              fi
+            fi
           done
+
+          echo "✅ Cleanup complete. Kept $KEEP_RELEASES releases."
 
