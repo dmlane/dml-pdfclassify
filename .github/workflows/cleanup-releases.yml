@@ -68,6 +68,10 @@ jobs:
               if ! gh release delete "$tag" --yes; then
                 echo "⚠️ Failed to delete release: $tag"
               fi
+              echo "Deleting tag: $tag"
+              if ! git push --delete origin "$tag"; then
+                echo "⚠️ Failed to delete tag: $tag"
+              fi
             fi
           done
 
