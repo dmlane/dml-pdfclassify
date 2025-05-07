@@ -2,7 +2,7 @@ name: Cleanup Old Releases and Orphaned Tags
 
 on:
   schedule:
-    - cron: '2 0 * * *'  # Every day  at 01:00 UTC
+    - cron: '0 1 * * *'  # Every day  at 01:00 UTC
   workflow_dispatch:
 
 permissions:
