@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "pdfclassify"
-version = "2025.5.11"
+version = "2025.05.11"
 description = "PDF classifier based on content etc"
 authors = ["Dave Lane <cheery.koala5370@fastmail.com>"]
 license = "MIT"
