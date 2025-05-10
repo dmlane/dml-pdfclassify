@@ -1,7 +1,5 @@
 # 📄 pdfclassify
 
-> ⚠️ **WARNING: This project is under active development and is not ready for production use. APIs and functionality may change without notice.**
-
 **pdfclassify** is a smart PDF classification and metadata management tool. It uses semantic embeddings to classify documents into labeled categories and stores custom metadata inside PDFs, such as the original filename, modification date, and classification result.
 
 ## 🚀 Features
@@ -21,32 +19,64 @@ cd pdfclassify
 poetry install
 ```
 
+## 📁 Directory Structure
 
-📦 Usage
+```text
+src/pdfclassify/
+├── main.py               # CLI entry point
+├── pdf_process.py        # Core processing class
+├── pdf_metadata_manager.py
+├── pdf_semantic_classifier.py
+├── argument_handler.py   # CLI argument parser
+tests/
+├── test_pdf_metadata_manager.py
+├── test_pdf_semantic_classifier.py
+```
 
-Classify a PDF file
+## 📦 Usage
+
+### Classify a PDF file
+
+```bash
 python src/pdfclassify/main.py -o OUTPUT_DIR path/to/input.pdf
-Restore a PDF to its original name and timestamp
+```
+
+### Restore a PDF to its original name and timestamp
+
+```bash
 python src/pdfclassify/main.py -r path/to/renamed.pdf
-Options
-Option	Description
--o	Output directory for classified PDFs
--r	Restore original filename and timestamp
-🧪 Running Tests
+```
 
+### Options
+
+| Option | Description |
+|--------|-------------|
+| `-o`   | Output directory for classified PDFs |
+| `-r`   | Restore original filename and timestamp |
+
+## 🧪 Running Tests
+
+```bash
 pytest
-🧹 Code Quality
+```
 
-Code is checked with pylint
-Formatting is enforced with black and isort
-Pre-commit hooks are configured in .pre-commit-config.yaml
+## 🧹 Code Quality
+
+- Code is checked with `pylint`
+- Formatting is enforced with `black` and `isort`
+- Pre-commit hooks are configured in `.pre-commit-config.yaml`
+
 Run locally with:
 
+```bash
 pre-commit run --all-files
-🧠 Training Data
+```
+
+## 🧠 Training Data
 
 Training data must be organized into subdirectories representing labels:
 
+```
 training_data/
 ├── invoice/
 │   ├── invoice_1.pdf
@@ -54,26 +84,25 @@ training_data/
 ├── report/
 │   ├── report_1.pdf
 │   └── ...
-📁 Embedding Cache
+```
+
+## 📁 Embedding Cache
 
 Embeddings and hashes are stored in:
 
+```bash
 ~/Library/Caches/net.dmlane/pdfclassify/
-🤝 Contributing
+```
+
+## 🤝 Contributing
 
 Contributions welcome! Please:
 
-Fork the repository
-Create a branch
-Add your changes with tests
-Open a pull request
-📝 License
+1. Fork the repository
+2. Create a branch
+3. Add your changes with tests
+4. Open a pull request
 
-This project is licensed under the MIT License. See LICENSE for details.
+## 📝 License
 
-
----
-
-
-
-
+This project is licensed under the MIT License. See [LICENSE](LICENSE) for details.

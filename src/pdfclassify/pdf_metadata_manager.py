@@ -2,10 +2,21 @@
 
 import os
 from dataclasses import dataclass, fields
+from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
 from pypdf import PdfReader, PdfWriter
+from pypdf.generic import NameObject, TextStringObject
+
+
+def _format_pdf_date(dt_str: str) -> str:
+    if dt_str.startswith("D:") and len(dt_str) >= 16:
+        # Already PDF-style format: return as-is to avoid corruption
+        return dt_str
+    # Assume ISO format and convert
+    dt = datetime.fromisoformat(dt_str)
+    return f"D:{dt.strftime('%Y%m%d%H%M%S')}"
 
 
 @dataclass
@@ -21,19 +32,12 @@ class PDFMetadataManager:
     """Manage custom metadata fields in PDF files while preserving timestamps."""
 
     def __init__(self, input_path: Path) -> None:
-        """
-        Initialize the metadata manager with the path to a PDF file.
-
-        Args:
-            input_path (Path): Path to the PDF file.
-        """
         self.input_path = input_path
         self.reader = PdfReader(input_path)
         self.mod_date = self.reader.metadata.get("/ModDate")
         self._original_stat = os.stat(input_path)
 
     def _load_metadata(self) -> dict:
-        """Reload metadata from disk."""
         return PdfReader(self.input_path).metadata or {}
 
     def print_metadata(self) -> None:
@@ -77,7 +81,7 @@ class PDFMetadataManager:
         value: str,
         output_path: Optional[Path] = None,
         overwrite: bool = True,
-    ) -> None:
+    ) -> bool:
         """
         Write or update a custom metadata field in the PDF.
 
@@ -89,10 +93,10 @@ class PDFMetadataManager:
         """
         current_metadata = self._load_metadata()
         if not overwrite and field_name in current_metadata:
-            return
-
+            return False
         save_path = output_path or self.input_path
-        self._update_metadata({field_name: value}, save_path)
+        self._update_metadata({field_name: value}, save_path, override=False)
+        return True
 
     def delete_custom_field(self, field_name: str, output_path: Optional[Path] = None) -> None:
         """
@@ -105,38 +109,38 @@ class PDFMetadataManager:
         current_metadata = self._load_metadata()
         if field_name not in current_metadata:
             return
-
         updated_metadata = current_metadata.copy()
         updated_metadata.pop(field_name, None)
         save_path = output_path or self.input_path
         self._update_metadata(updated_metadata, save_path, override=True)
 
     def _update_metadata(
-        self,
-        new_data: dict[str, str],
-        save_path: Path,
-        override: bool = False,
+        self, new_data: dict[str, str], save_path: Path, override: bool = False
     ) -> None:
-        """
-        Internal helper to write updated metadata and restore timestamps.
-
-        Args:
-            new_data (dict[str, str]): Fields to update (or full metadata if override=True).
-            save_path (Path): Where to save the output file.
-            override (bool): Whether to overwrite all metadata or just update fields.
-        """
         writer = PdfWriter()
-        writer.append_pages_from_reader(PdfReader(self.input_path))
+        reader = PdfReader(self.input_path)  # Re-read to avoid stale state
+        writer.append_pages_from_reader(reader)
 
-        metadata = {} if override else self._load_metadata()
-        metadata.update(new_data)
+        metadata = {}
+        if not override:
+            existing_metadata = reader.metadata or {}
+            metadata.update(
+                {
+                    NameObject(k): TextStringObject(str(v))
+                    for k, v in existing_metadata.items()
+                    if isinstance(k, str) and v is not None
+                }
+            )
+
+        for k, v in new_data.items():
+            metadata[NameObject(k)] = TextStringObject(str(v))
 
         if self.mod_date:
-            metadata["/ModDate"] = self.mod_date
+            metadata[NameObject("/ModDate")] = TextStringObject(_format_pdf_date(self.mod_date))
 
         writer.add_metadata(metadata)
 
-        with open(save_path, mode="wb") as file_handle:
-            writer.write(file_handle)
+        with open(save_path, "wb") as f:
+            writer.write(f)
 
         os.utime(save_path, (self._original_stat.st_atime, self._original_stat.st_mtime))

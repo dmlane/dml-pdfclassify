@@ -7,7 +7,7 @@ import time
 from pathlib import Path
 
 import pytest
-from pypdf import PdfWriter
+from pypdf import PdfReader, PdfWriter
 
 from pdfclassify.pdf_metadata_manager import PDFMetadataManager
 
@@ -71,3 +71,33 @@ def test_print_metadata_smoke(sample_pdf_file: Path, capsys: pytest.CaptureFixtu
     assert "custom metadata for" in captured.out.lower()
     assert "classification" in captured.out.lower()
     assert "invoice" in captured.out.lower()
+
+
+def test_mod_date_preserved_format(sample_pdf_file: Path) -> None:
+    """Ensure that /ModDate is preserved and formatted properly."""
+    # Manually write a PDF with a ModDate field
+    writer = PdfWriter()
+    writer.add_blank_page(width=72, height=72)
+    writer.add_metadata({"/ModDate": "D:20240508120000"})
+    with open(sample_pdf_file, "wb") as f:
+        writer.write(f)
+
+    # Confirm the ModDate was written
+    reader = PdfReader(sample_pdf_file)
+    assert reader.metadata.get("/ModDate") == "D:20240508120000"
+
+    # Now use your manager and trigger a write
+    manager = PDFMetadataManager(sample_pdf_file)
+    manager.write_custom_field("/TestField", "Value")
+
+    # Confirm the ModDate still exists after the update
+    mod_date = manager.read_custom_field("/ModDate")
+    assert mod_date is not None
+    assert mod_date.startswith("D:")
+
+
+def test_write_custom_field_return_value(sample_pdf_file: Path) -> None:
+    """Ensure write_custom_field returns True on write and False when skipped."""
+    manager = PDFMetadataManager(sample_pdf_file)
+    assert manager.write_custom_field("/Foo", "bar") is True
+    assert manager.write_custom_field("/Foo", "baz", overwrite=False) is False

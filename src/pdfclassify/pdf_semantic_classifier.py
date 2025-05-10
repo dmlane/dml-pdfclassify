@@ -27,6 +27,8 @@ from sentence_transformers import SentenceTransformer
 ORGANISATION = "net.dmlane"
 APP_NAME = "pdfclassify"
 
+logging.getLogger("pdfminer").setLevel(logging.ERROR)
+
 
 @dataclass
 class Classification:
@@ -128,6 +130,7 @@ class PDFSemanticClassifier:
 
                 if previous_hashes.get(file_path_str) != file_hash or not embedding_path.exists():
                     try:
+                        # pylint: disable=unexpected-keyword-arg
                         text = extract_text(pdf_file)
                         if text.strip():
                             vec = self.embedder.encode([text], convert_to_numpy=True)[0]

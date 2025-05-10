@@ -40,13 +40,13 @@ class PdfProcess:
         """Restore the original file name and timestamp from custom metadata"""
         pdf_manager = PDFMetadataManager(self.pdf_file)
         original_file_name = pdf_manager.read_custom_field("/Original_Filename")
+        original_date = pdf_manager.read_custom_field("/Original_Date")
         if original_file_name is not None:
             new_file_name = Path(original_file_name).name
             new_path = self.pdf_file.parent / new_file_name
             self.pdf_file.rename(new_path)
             self.pdf_file = new_path
 
-        original_date = pdf_manager.read_custom_field("/Original_Date")
         if original_date is not None:
             mod_time = datetime.fromisoformat(original_date).timestamp()
             os.utime(self.pdf_file, (mod_time, mod_time))
