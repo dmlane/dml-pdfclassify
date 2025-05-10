@@ -5,6 +5,8 @@ import shutil
 from datetime import datetime
 from pathlib import Path
 
+from pypdf.errors import PdfReadError
+
 from pdfclassify._util import MyException
 from pdfclassify.argument_handler import ParsedArgs
 from pdfclassify.pdf_metadata_manager import PDFMetadataManager
@@ -18,7 +20,10 @@ class PdfProcess:
         self.pdf_file = Path(pdf_path)
         if not self.pdf_file.is_file():
             raise MyException(f"File {pdf_path} does not exist", 1)
-        self._save_metadata()
+        try:
+            self._save_metadata()
+        except PdfReadError as e:
+            raise MyException(f"Invalid PDF file: {e}", 2) from e
 
     def display_info(self) -> None:
         """Display metadata and info about the file"""
