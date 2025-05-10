@@ -21,17 +21,7 @@ cd pdfclassify
 poetry install
 ```
 
-📁 Directory Structure
 
-src/pdfclassify/
-├── main.py               # CLI entry point
-├── pdf_process.py        # Core processing class
-├── pdf_metadata_manager.py
-├── pdf_semantic_classifier.py
-├── argument_handler.py   # CLI argument parser
-tests/
-├── test_pdf_metadata_manager.py
-├── test_pdf_semantic_classifier.py
 📦 Usage
 
 Classify a PDF file
@@ -84,7 +74,6 @@ This project is licensed under the MIT License. See LICENSE for details.
 
 ---
 
-Would you like a badge section (build status, Python version, etc.) or example screenshots added as well?
 
 
 
