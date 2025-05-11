@@ -1,6 +1,6 @@
 """Argument handler for this project."""
 
-from argparse import ArgumentParser, Namespace
+from argparse import ArgumentParser, Namespace, _HelpAction
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Sequence
@@ -11,6 +11,18 @@ ICLOUD_PATH = "Library/Mobile Documents/com~apple~CloudDocs/net.dmlane/pdfclassi
 CLOUD_DIR = Path.home() / ICLOUD_PATH
 DEFAULT_TRAINING_PATH = (CLOUD_DIR / "training_data").as_posix()
 DEFAULT_OUTPUT_PATH = (CLOUD_DIR / "output").as_posix()
+
+
+class HelpAndCustom(_HelpAction):
+    """Help action that prints the help text and then runs custom logic."""
+
+    def __call__(self, parser, namespace, values, option_string=None):
+        # 1) Print the normal help text
+        parser.print_help()
+        # 2) Then run your custom code
+        CONFIG.show_config()
+        # 3) Exit as usual
+        parser.exit()
 
 
 def get_version() -> str:
@@ -25,9 +37,9 @@ class ParsedArgs:
     """Parsed command-line arguments for the PDF classifier."""
 
     verbose: bool
-    input_file: Path
-    training_data_path: Path
-    output_path: Path
+    input_file: str
+    training_data_path: str
+    output_path: str
     no_rename: bool
     restore_original: bool
     info: bool
@@ -52,6 +64,13 @@ class ArgumentHandler:
         parser = CustomArgumentParser(
             description="Classify PDF files based on semantic embeddings",
             formatter_class=RawFormatter,
+            add_help=False,
+        )
+        parser.add_argument(
+            "-h",
+            "--help",
+            action=HelpAndCustom,
+            help="show this help message and then run custom code",
         )
         parser.add_argument(
             "-V",
@@ -105,9 +124,9 @@ class ArgumentHandler:
 
         return ParsedArgs(
             verbose=args.verbose,
-            input_file=Path(args.input_file),
-            training_data_path=Path(args.training_data_path),
-            output_path=Path(args.output_path),
+            input_file=args.input_file,
+            training_data_path=args.training_data_path,
+            output_path=args.output_path,
             no_rename=args.no_rename,
             restore_original=args.restore_original,
             info=args.info,
