@@ -5,10 +5,10 @@
 output_dir = "~/Documents/pdfclassify/output"
 
 # Directory containing labeled training PDFs (used for training classifier)
-training_data_dir = "APPDIR:config/training_data"
+training_data_dir = "~/Documents/pdfclassify/training_data"
 
 # Directory where cached embeddings and model files will be stored
-cache_dir = "APPDIR:cache/pdfclassify"
+cache_dir = "~/.config/pdfclassify/cache"
 
 [settings]
 # Confidence threshold for classification (0.0 to 1.0).
