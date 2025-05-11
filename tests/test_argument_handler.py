@@ -1,6 +1,7 @@
 """Unit tests for the ArgumentHandler class in pdfclassify.argument_handler."""
 
 from importlib.metadata import version
+from pathlib import Path
 
 import pytest
 
@@ -14,9 +15,9 @@ def test_valid_arguments() -> None:
     )
     assert isinstance(args, ParsedArgs)
     assert args.verbose is True
-    assert args.input_file == "sample.pdf"
-    assert args.training_data_path == "/tmp/training"
-    assert args.output_path == "/tmp/output"
+    assert str(args.input_file) == "sample.pdf"
+    assert str(args.training_data_path) == "/tmp/training"
+    assert str(args.output_path) == "/tmp/output"
     assert args.no_rename is True
     assert args.restore_original is False
     assert args.info is False
@@ -65,9 +66,9 @@ def test_missing_input_file_raises(capsys: pytest.CaptureFixture) -> None:
 def test_default_paths_are_set() -> None:
     """Test that default training and output paths are set when omitted."""
     args = ArgumentHandler().parse_args_from(["sample.pdf"])
-    assert isinstance(args.training_data_path, str)
-    assert "training_data" in args.training_data_path
-    assert "output" in args.output_path
+    assert isinstance(args.training_data_path, Path)
+    assert "training_data" in args.training_data_path.parts
+    assert "output" in args.output_path.parts
 
 
 def test_version_output(capsys: pytest.CaptureFixture) -> None:

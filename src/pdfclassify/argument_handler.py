@@ -25,9 +25,9 @@ class ParsedArgs:
     """Parsed command-line arguments for the PDF classifier."""
 
     verbose: bool
-    input_file: str
-    training_data_path: str
-    output_path: str
+    input_file: Path
+    training_data_path: Path
+    output_path: Path
     no_rename: bool
     restore_original: bool
     info: bool
@@ -105,9 +105,9 @@ class ArgumentHandler:
 
         return ParsedArgs(
             verbose=args.verbose,
-            input_file=args.input_file,
-            training_data_path=args.training_data_path,
-            output_path=args.output_path,
+            input_file=Path(args.input_file),
+            training_data_path=Path(args.training_data_path),
+            output_path=Path(args.output_path),
             no_rename=args.no_rename,
             restore_original=args.restore_original,
             info=args.info,
