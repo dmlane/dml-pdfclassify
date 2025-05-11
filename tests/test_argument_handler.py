@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pytest
 
+from pdfclassify._util import CONFIG
 from pdfclassify.argument_handler import ArgumentHandler, ParsedArgs
 
 
@@ -63,12 +64,22 @@ def test_missing_input_file_raises(capsys: pytest.CaptureFixture) -> None:
     print("\n" + captured.err)
 
 
-def test_default_paths_are_set() -> None:
+def test_default_paths_are_set(monkeypatch) -> None:
     """Test that default training and output paths are set when omitted."""
+    # Override CONFIG defaults for isolation
+
+    test_train = Path("/tmp/training_data")
+    test_output = Path("/tmp/output")
+    monkeypatch.setattr(CONFIG, "training_data_dir", test_train)
+    monkeypatch.setattr(CONFIG, "output_dir", test_output)
+
     args = ArgumentHandler().parse_args_from(["sample.pdf"])
     assert isinstance(args.training_data_path, Path)
-    assert "training_data" in args.training_data_path.parts
-    assert "output" in args.output_path.parts
+    assert (
+        test_train in Path(args.training_data_path).parents or args.training_data_path == test_train
+    )
+    assert isinstance(args.output_path, Path)
+    assert test_output in Path(args.output_path).parents or args.output_path == test_output
 
 
 def test_version_output(capsys: pytest.CaptureFixture) -> None:

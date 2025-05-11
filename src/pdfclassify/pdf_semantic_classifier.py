@@ -1,18 +1,19 @@
-# pylint: disable=line-too-long, broad-exception-caught
 """Multilingual PDF Semantic Classifier
 
 This module defines a single class:
-- PDFSemanticClassifier: Uses multilingual embeddings and cosine similarity for DEVONthink-style classification.
+- PDFSemanticClassifier: Uses multilingual embeddings and cosine similarity for DEVONthink-style
+classification.
 
-The classifier caches its model and only retrains when new, modified, or deleted PDF files are detected.
+The classifier caches its model and only retrains when new, modified, or deleted PDF files are
+detected.
 Embeddings for each PDF file are persisted individually for incremental training.
 """
-
 
 import hashlib
 import json
 import logging
 from dataclasses import dataclass
+from json import JSONDecodeError  # at top of file
 from logging.handlers import TimedRotatingFileHandler
 from pathlib import Path
 from typing import List
@@ -21,6 +22,7 @@ import joblib
 import numpy as np
 import torch
 from pdfminer.high_level import extract_text
+from pdfminer.pdfparser import PDFSyntaxError
 from platformdirs import user_cache_dir, user_log_dir
 from sentence_transformers import SentenceTransformer
 
@@ -40,7 +42,10 @@ class Classification:
 
 
 def get_logger(app_name=APP_NAME, org_name=ORGANISATION, filename="retrain.log") -> logging.Logger:
-    """Create a weekly rotating file logger in the macOS standard log location (rotates Sunday at midnight)."""
+    """
+    Create a weekly rotating file logger in the macOS standard log location (rotates Sunday at
+    midnight).
+    """
     log_dir = Path(user_log_dir())
     log_dir = log_dir / org_name / app_name
     log_dir.mkdir(parents=True, exist_ok=True)
@@ -77,11 +82,10 @@ class PDFSemanticClassifier:
         self.model_path = self.cache_dir / "model.joblib"
         self.hash_path = self.cache_dir / "file_hashes.json"
         self.embeddings_dir = self.cache_dir / "embeddings"
-        self.embeddings_dir.mkdir(exist_ok=True)
-
+        self.embeddings_dir.mkdir(exist_ok=True, parents=True)
+        self.data_dir.mkdir(parents=True, exist_ok=True)
         self.logger = get_logger()
 
-        self.documents: List[str] = []
         self.labels: List[str] = []
 
         device = (
@@ -99,8 +103,9 @@ class PDFSemanticClassifier:
             with open(path, "rb") as file:
                 for chunk in iter(lambda: file.read(4096), b""):
                     hash_md5.update(chunk)
+
             hash_md5.update(str(path.stat().st_mtime).encode())
-        except Exception as exc:
+        except (OSError, IOError) as exc:
             self.logger.warning("Failed to compute hash for %s: %s", path, exc)
         return hash_md5.hexdigest()
 
@@ -136,7 +141,9 @@ class PDFSemanticClassifier:
                             vec = self.embedder.encode([text], convert_to_numpy=True)[0]
                             joblib.dump((vec, label), embedding_path)
                             self.logger.info("Updated embedding: %s", pdf_file)
-                    except Exception as exc:
+
+                    except (OSError, ValueError, PDFSyntaxError) as exc:
+
                         self.logger.warning("Failed to embed %s: %s", pdf_file, exc)
 
                 if embedding_path.exists():
@@ -144,7 +151,10 @@ class PDFSemanticClassifier:
                         vec, lbl = joblib.load(embedding_path)
                         embeddings.append(vec)
                         labels.append(lbl)
-                    except Exception as exc:
+                    except (
+                        EOFError,
+                        joblib.externals.loky.process_executor.TerminatedWorkerError,
+                    ) as exc:
                         self.logger.warning("Failed to load embedding %s: %s", embedding_path, exc)
 
         deleted_files = set(previous_hashes.keys()) - all_current_files
@@ -159,20 +169,29 @@ class PDFSemanticClassifier:
         return new_hashes
 
     def train(self) -> None:
-        """Train or update the model from persistent embeddings. Also prune empty label directories."""
+        """
+        Train or update the model from persistent embeddings. Also prune empty label directories.
+        """
         for label_dir in self.data_dir.iterdir():
             if label_dir.is_dir() and not any(label_dir.glob("*.pdf")):
                 self.logger.info("Pruning empty label directory: %s", label_dir)
                 try:
                     label_dir.rmdir()
-                except Exception as exc:
+                except OSError as exc:
                     self.logger.warning("Failed to remove %s: %s", label_dir, exc)
 
         previous_hashes = {}
-        if self.hash_path.exists():
-            with open(self.hash_path, "r", encoding="utf-8") as f:
-                previous_hashes = json.load(f)
 
+        if self.hash_path.exists():
+            try:
+                with open(self.hash_path, "r", encoding="utf-8") as f:
+                    previous_hashes = json.load(f)
+            except (JSONDecodeError, ValueError):
+                self.logger.warning(
+                    "Could not parse %r (invalid JSON); starting from a clean hash set.",
+                    self.hash_path,
+                )
+                previous_hashes = {}
         updated_hashes = self._load_data(previous_hashes)
 
         if self.doc_vectors is None or not self.labels:
@@ -194,14 +213,22 @@ class PDFSemanticClassifier:
             "Predicting label for %s with threshold %.2f", pdf_path, confidence_threshold
         )
 
-        # Automatically retrain if needed
+        # First, make sure we can even read and extract text from the PDF
+        try:
+            text = extract_text(pdf_path)
+        except Exception as exc:
+            # e.g. PDFSyntaxError, FileNotFoundError, etc.
+            raise ValueError(f"Failed to extract PDF: {exc}") from exc
+        if not text.strip():
+            raise ValueError("PDF text is empty.")
+
         if not self.model_path.exists() or not self.hash_path.exists():
             self.logger.info("Model or hash file missing — triggering train().")
             self.train()
         elif self.doc_vectors is None or not self.labels:
             try:
                 self._load_cached_model()
-            except Exception as exc:
+            except (EOFError, joblib.externals.loky.process_executor.TerminatedWorkerError) as exc:
                 self.logger.warning("Failed to load cached model: %s. Retraining.", exc)
                 self.train()
 
@@ -209,8 +236,12 @@ class PDFSemanticClassifier:
             raise RuntimeError("Model is not trained. Run train() first.")
         try:
             text = extract_text(pdf_path)
+        except PDFSyntaxError:
+            text = ""
         except Exception as exc:
+
             raise ValueError(f"Failed to extract PDF: {exc}") from exc
+
         if not text.strip():
             raise ValueError("PDF text is empty.")
 
