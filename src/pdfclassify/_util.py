@@ -1,13 +1,21 @@
-""" Utility classes and functions"""
+"""Utility classes and functions"""
+
 import argparse
 import textwrap
 
-class MyException(Exception):
-    """Custom exception class"""
+from pdfclassify.config import PDFClassifyConfig
 
-    def __init__(self, msg: str, code: int):
-        self.code = code
-        self.msg = msg
+# Load config once only and make it available throughout the application
+CONFIG = PDFClassifyConfig()
+
+
+class MyException(Exception):
+    """Custom exception with exit code for controlled termination."""
+
+    def __init__(self, message: str, exit_code: int = 1) -> None:
+        super().__init__(message)
+        self.exit_code = exit_code
+
 
 class RawFormatter(argparse.HelpFormatter):
     """Help formatter to split the text on newlines and indent each line"""

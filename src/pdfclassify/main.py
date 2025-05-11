@@ -46,7 +46,7 @@ def main():
     try:
         Pdfclassify().run()
     except MyException as e:
-        print(e.msg)
+        print(e)
         sys.exit(1)
 
 

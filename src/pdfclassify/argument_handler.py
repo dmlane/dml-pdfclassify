@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Sequence
 
-from pdfclassify._util import RawFormatter
+from pdfclassify._util import CONFIG, RawFormatter
 
 ICLOUD_PATH = "Library/Mobile Documents/com~apple~CloudDocs/net.dmlane/pdfclassify"
 CLOUD_DIR = Path.home() / ICLOUD_PATH
@@ -66,13 +66,13 @@ class ArgumentHandler:
         parser.add_argument(
             "-t",
             "--training-data-path",
-            default=DEFAULT_TRAINING_PATH,
+            default=CONFIG.training_data_dir,
             help="Path to the directory containing the training data",
         )
         parser.add_argument(
             "-o",
             "--output-path",
-            default=DEFAULT_OUTPUT_PATH,
+            default=CONFIG.output_dir,
             help="Path to save the labelled file",
         )
 

@@ -188,7 +188,7 @@ class PDFSemanticClassifier:
         """Load embedding vectors and labels from disk."""
         self.doc_vectors, self.labels = joblib.load(self.model_path)
 
-    def predict(self, pdf_path: str, confidence_threshold: float = 0.5) -> Classification:
+    def predict(self, pdf_path: str, confidence_threshold: float = 0.75) -> Classification:
         """Predict the label for a PDF based on cosine similarity."""
         self.logger.info(
             "Predicting label for %s with threshold %.2f", pdf_path, confidence_threshold

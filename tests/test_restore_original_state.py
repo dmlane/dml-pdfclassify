@@ -27,34 +27,28 @@ def dummy_pdf(tmp_path: Path) -> Path:
     return pdf_path
 
 
-def test_restore_original_state(dummy_pdf: Path, tmp_path: Path) -> None:
+def test_restore_original_state(valid_pdf_file: Path, tmp_path: Path) -> None:
     """Ensure PdfProcess can restore the original name and timestamp."""
-    # Instantiate to store metadata
-    process = PdfProcess(str(dummy_pdf))
-    original_name = dummy_pdf.name
-    original_mod_time = os.path.getmtime(dummy_pdf)
+    process = PdfProcess(str(valid_pdf_file))
+    original_name = valid_pdf_file.name
+    original_mod_time = os.path.getmtime(valid_pdf_file)
 
-    # Rename and move file manually
+    # Move and rename file
     new_path = tmp_path / "renamed.pdf"
-    dummy_pdf.rename(new_path)
-
-    # Confirm it changed
+    valid_pdf_file.rename(new_path)
     assert new_path.name != original_name
 
-    # Modify timestamp
-    new_mod_time = datetime.now().timestamp()
-    os.utime(new_path, (new_mod_time, new_mod_time))
+    # Change timestamp
+    os.utime(new_path, None)
     assert os.path.getmtime(new_path) != original_mod_time
 
-    # Re-run process on moved file
+    # Restore state
     process = PdfProcess(str(new_path))
     process.restore_original_state()
 
-    # Confirm restored path and name
     restored_path = new_path.parent / original_name
     assert restored_path.exists()
     assert restored_path.name == original_name
 
-    # Confirm restored timestamp (allow slight rounding drift)
     restored_mod_time = os.path.getmtime(restored_path)
-    assert abs(restored_mod_time - original_mod_time) < 1, "Timestamp not restored"
+    assert abs(restored_mod_time - original_mod_time) < 1

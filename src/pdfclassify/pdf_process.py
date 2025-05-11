@@ -7,7 +7,7 @@ from pathlib import Path
 
 from pypdf.errors import PdfReadError
 
-from pdfclassify._util import MyException
+from pdfclassify._util import CONFIG, MyException
 from pdfclassify.argument_handler import ParsedArgs
 from pdfclassify.pdf_metadata_manager import PDFMetadataManager
 from pdfclassify.pdf_semantic_classifier import Classification, PDFSemanticClassifier
@@ -31,15 +31,27 @@ class PdfProcess:
         pdf_manager.print_metadata()
 
     def _save_metadata(self) -> None:
-        """Save details about the file in custom metadata fields"""
-        pdf_manager = PDFMetadataManager(self.pdf_file)
-        mod_time = os.path.getmtime(self.pdf_file)
-        mod_date_str = datetime.fromtimestamp(mod_time).isoformat()
+        """Save details about the file in custom metadata fields."""
+        try:
+            pdf_manager = PDFMetadataManager(self.pdf_file)
+            mod_time = os.path.getmtime(self.pdf_file)
+            mod_date_str = datetime.fromtimestamp(mod_time).isoformat()
 
-        if pdf_manager.read_custom_field("/Original_Filename") is None:
-            pdf_manager.write_custom_field("/Original_Filename", self.pdf_file.name)
-        if pdf_manager.read_custom_field("/Original_Date") is None:
-            pdf_manager.write_custom_field("/Original_Date", mod_date_str)
+            existing = {
+                "/Original_Filename": pdf_manager.read_custom_field("/Original_Filename"),
+                "/Original_Date": pdf_manager.read_custom_field("/Original_Date"),
+            }
+
+            if existing["/Original_Filename"] is None:
+                pdf_manager.write_custom_field("/Original_Filename", self.pdf_file.name)
+
+            if existing["/Original_Date"] is None:
+                pdf_manager.write_custom_field("/Original_Date", mod_date_str)
+
+        except PdfReadError as e:
+            raise MyException(f"Invalid PDF file: {e}", 2) from e
+        except Exception as e:
+            raise MyException(f"Unexpected error during metadata save: {e}", 3) from e
 
     def restore_original_state(self) -> None:
         """Restore the original file name and timestamp from custom metadata"""
@@ -63,7 +75,7 @@ class PdfProcess:
         classifier.train()
         label = classifier.predict(
             pdf_path=str(self.pdf_file),
-            confidence_threshold=0.7,
+            confidence_threshold=CONFIG.confidence_threshold,
         )
         print(
             f"Predicted label: {label.label} with confidence "
@@ -115,22 +127,22 @@ class PdfProcess:
         if not rename:
             return None
 
-        suffix = ".pdf"  # Force lowercase suffix
+        suffix = ".pdf"
+        original_stem = file_name.stem  # Always start from the original name
 
         if prediction.success:
             base_dir = output_path if output_path else file_name.parent
-            base_dir.mkdir(parents=True, exist_ok=True)
-            new_name = f"{prediction.label}{suffix}"
+            new_stem = prediction.label
         else:
             base_dir = file_name.parent / "pdfclassify.rejects"
-            base_dir.mkdir(parents=True, exist_ok=True)
-            new_name = file_name.stem + suffix  # Replace any uppercase extension
+            new_stem = original_stem
 
-        new_path = base_dir / new_name
+        base_dir.mkdir(parents=True, exist_ok=True)
+
+        new_path = base_dir / f"{new_stem}{suffix}"
         counter = 1
         while new_path.exists():
-            stem = new_path.stem
-            new_path = base_dir / f"{stem}_{counter}{suffix}"
+            new_path = base_dir / f"{new_stem}_{counter}{suffix}"
             counter += 1
 
         shutil.move(str(file_name), new_path)
