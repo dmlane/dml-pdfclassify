@@ -1,5 +1,7 @@
 # 📄 pdfclassify
 
+⚠️ **WARNING: This project is under active development and is not ready for production use. APIs and functionality may change without notice.**
+
 **pdfclassify** is a smart PDF classification and metadata management tool. It uses semantic embeddings to classify documents into labeled categories and stores custom metadata inside PDFs, such as the original filename, modification date, and classification result.
 
 ## 🚀 Features
