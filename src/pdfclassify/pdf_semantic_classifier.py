@@ -12,6 +12,7 @@ Embeddings for each PDF file are persisted individually for incremental training
 import hashlib
 import json
 import logging
+from dataclasses import dataclass
 from logging.handlers import TimedRotatingFileHandler
 from pathlib import Path
 from typing import List
@@ -25,6 +26,17 @@ from sentence_transformers import SentenceTransformer
 
 ORGANISATION = "net.dmlane"
 APP_NAME = "pdfclassify"
+
+logging.getLogger("pdfminer").setLevel(logging.ERROR)
+
+
+@dataclass
+class Classification:
+    """Classification result."""
+
+    confidence: float
+    label: str
+    success: bool = True
 
 
 def get_logger(app_name=APP_NAME, org_name=ORGANISATION, filename="retrain.log") -> logging.Logger:
@@ -118,6 +130,7 @@ class PDFSemanticClassifier:
 
                 if previous_hashes.get(file_path_str) != file_hash or not embedding_path.exists():
                     try:
+                        # pylint: disable=unexpected-keyword-arg
                         text = extract_text(pdf_file)
                         if text.strip():
                             vec = self.embedder.encode([text], convert_to_numpy=True)[0]
@@ -175,7 +188,7 @@ class PDFSemanticClassifier:
         """Load embedding vectors and labels from disk."""
         self.doc_vectors, self.labels = joblib.load(self.model_path)
 
-    def predict(self, pdf_path: str, confidence_threshold: float = 0.5) -> str:
+    def predict(self, pdf_path: str, confidence_threshold: float = 0.75) -> Classification:
         """Predict the label for a PDF based on cosine similarity."""
         self.logger.info(
             "Predicting label for %s with threshold %.2f", pdf_path, confidence_threshold
@@ -207,13 +220,16 @@ class PDFSemanticClassifier:
         sims = np.dot(vec, doc_vecs.T)[0]
         best_index = np.argmax(sims)
         best_score = sims[best_index]
+        predicted_label = self.labels[best_index]
         if best_score < confidence_threshold:
             self.logger.info(
                 "Prediction below threshold: score=%.3f, assigned=__uncertain__", best_score
             )
-            return "__uncertain__"
-        predicted_label = self.labels[best_index]
-        self.logger.info(
-            "Prediction above threshold: score=%.3f, assigned=%s", best_score, predicted_label
-        )
-        return predicted_label
+            success = False
+        else:
+            self.logger.info(
+                "Prediction above threshold: score=%.3f, assigned=%s", best_score, predicted_label
+            )
+
+            success = True
+        return Classification(label=predicted_label, confidence=best_score, success=success)

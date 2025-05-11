@@ -1,0 +1,17 @@
+# Default pdfclassify.toml configuration
+
+[paths]
+# Default output directory where processed PDFs will be saved
+output_dir = "~/Documents/pdfclassify/output"
+
+# Directory containing labeled training PDFs (used for training classifier)
+training_data_dir = "~/Documents/pdfclassify/training_data"
+
+# Directory where cached embeddings and model files will be stored
+cache_dir = "~/.config/pdfclassify/cache"
+
+[settings]
+# Confidence threshold for classification (0.0 to 1.0).
+# Higher values may result in fewer false positives but may also increase processing time.
+# 0.75 seems to be a good balance in tests.
+confidence_threshold = 0.75
