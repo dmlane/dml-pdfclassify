@@ -17,7 +17,7 @@ packages = [
 ]
 
 [tool.poetry.dependencies]
-python = "^3.12"
+python = ">=3.12,<3.13"
 sentence-transformers = "^4.1.0"
 pdfminer-six = "^20250416"
 joblib = "^1.4.2"
@@ -62,8 +62,8 @@ requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
 
 [tool.black]
+# no target-version; Black will infer from the venv’s interpreter
 line_length = 100
-target-version = ['py312']
 
 [tool.isort]
 profile = "black"
