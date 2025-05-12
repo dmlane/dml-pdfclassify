@@ -14,6 +14,7 @@
 ## 🛠️ Installation
 
 ```bash
+# Will run on python 3.12 - not tested on 3.13
 git clone https://github.com/dmlane/pdfclassify.git
 cd pdfclassify
 poetry install
