@@ -1,7 +1,5 @@
 # 📄 pdfclassify
 
-⚠️ **WARNING: This project is under active development and is not ready for production use. APIs and functionality may change without notice.**
-
 **pdfclassify** is a smart PDF classification and metadata management tool. It uses semantic embeddings to classify documents into labeled categories and stores custom metadata inside PDFs, such as the original filename, modification date, and classification result.
 
 ## 🚀 Features
@@ -159,6 +157,10 @@ You are responsible for ensuring this software meets your requirements and compl
 ---
 
 For questions or issues, please [open an issue](https://github.com/dmlane/pdfclassify/issues).
+
+## Credits
+
+Portions of this code were generated with the assistance of ChatGPT, an AI language model by OpenAI.
 
 ## 📝 License
 
