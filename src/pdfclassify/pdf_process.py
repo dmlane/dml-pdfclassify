@@ -15,7 +15,7 @@ from pdfclassify.pdf_semantic_classifier import Classification, PDFSemanticClass
 
 
 class PdfProcess:
-    """Class to manipulate the name and/or metadata of a pdf."""
+    """Process a PDF file with the specified operations."""
 
     def __init__(self, pdf_path: str):
         self.pdf_file = Path(pdf_path)
@@ -25,20 +25,26 @@ class PdfProcess:
         # ── skip zero-length iCloud placeholder PDFs ──
         try:
             size = self.pdf_file.stat().st_size
+
+            # try Python API first
             try:
                 xattrs = os.listxattr(self.pdf_file)
-            except AttributeError:
-                # fallback to the xattr command if needed
-                raw = subprocess.check_output(["xattr", "-l", str(self.pdf_file)], text=True)
-                xattrs = [line.split(":", 1)[0] for line in raw.splitlines() if ":" in line]
+            except (AttributeError, NotImplementedError):
+                # fallback: xattr lists only names when no -l flag is given
+                raw = subprocess.check_output(
+                    ["xattr", str(self.pdf_file)], stderr=subprocess.DEVNULL
+                )
+                # decode loosely to avoid errors
+                names = raw.decode("utf-8", errors="ignore").splitlines()
+                xattrs = names
 
             if size == 0 and "com.apple.placeholder" in xattrs:
                 raise MyException(f"Skipping zero-length placeholder PDF: {pdf_path}", 4)
         except OSError:
-            # e.g. permission error listing attrs — ignore and let later code catch it
+            # e.g. permission error — ignore and let later code handle
             pass
 
-        # Proceed with normal metadata saving
+        # proceed with the existing metadata save
         try:
             self._save_metadata()
         except PdfReadError as e:
