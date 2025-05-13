@@ -2,6 +2,7 @@
 
 import os
 import shutil
+import subprocess
 from datetime import datetime
 from pathlib import Path
 
@@ -20,6 +21,24 @@ class PdfProcess:
         self.pdf_file = Path(pdf_path)
         if not self.pdf_file.is_file():
             raise MyException(f"File {pdf_path} does not exist", 1)
+
+        # ── skip zero-length iCloud placeholder PDFs ──
+        try:
+            size = self.pdf_file.stat().st_size
+            try:
+                xattrs = os.listxattr(self.pdf_file)
+            except AttributeError:
+                # fallback to the xattr command if needed
+                raw = subprocess.check_output(["xattr", "-l", str(self.pdf_file)], text=True)
+                xattrs = [line.split(":", 1)[0] for line in raw.splitlines() if ":" in line]
+
+            if size == 0 and "com.apple.placeholder" in xattrs:
+                raise MyException(f"Skipping zero-length placeholder PDF: {pdf_path}", 4)
+        except OSError:
+            # e.g. permission error listing attrs — ignore and let later code catch it
+            pass
+
+        # Proceed with normal metadata saving
         try:
             self._save_metadata()
         except PdfReadError as e:
