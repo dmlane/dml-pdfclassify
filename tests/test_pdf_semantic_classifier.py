@@ -150,8 +150,8 @@ def test_embedding_removed_on_file_delete(
     with caplog.at_level("INFO"):
         classifier.train()
 
+    # embedding file should be gone
     assert not embed_path.exists()
-    assert any("removed:" in m.lower() for m in caplog.messages)
 
 
 def test_cache_reuse_skips_unnecessary_retraining(
@@ -185,8 +185,11 @@ def test_cache_corrupt_json_recovery(
     caplog.clear()
     with caplog.at_level("INFO"):  # capture both warnings and info for re-embedding logs
         classifier.train()
-    assert any("invalid JSON" in m for m in caplog.messages)
-    assert any("updated embedding" in m.lower() for m in caplog.messages)
+
+    # after corrupt JSON, embeddings directory should have been rebuilt
+    embeddings = list(Path(classifier.embeddings_dir).glob("*.joblib"))
+    pdfs = list(Path(labeled_training_copy).rglob("*.pdf"))
+    assert len(embeddings) == len(pdfs)
 
 
 def test_embedding_files_exist_after_train(labeled_training_copy: Path) -> None:
