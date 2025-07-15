@@ -31,7 +31,9 @@
       packages = forAllSystems (
         { pkgs, system }:
         let
-          project = pyproject-nix.lib.project.loadPoetryPyproject ./.;
+          project = pyproject-nix.lib.project.loadPoetryPyproject {
+            projectDir = ./.;
+          };
         in
         {
           default = project;
@@ -44,6 +46,10 @@
         {
           default = pkgs.mkShell {
             inputsFrom = [ self.packages.${system}.default ];
+            packages = with pkgs; [
+              poetry
+              python312
+            ];
           };
         }
       );
