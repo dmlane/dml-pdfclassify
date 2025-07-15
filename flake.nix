@@ -1,10 +1,17 @@
 {
-  description = "Nix flake for dml-pdfclassify (Poetry CLI using Python 3.12)";
+  description = "Nix flake for dml-pdfclassify using pyproject.nix";
 
-  inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-25.05";
+  inputs = {
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-25.05";
+    pyproject-nix.url = "github:nix-community/pyproject.nix";
+  };
 
   outputs =
-    { self, nixpkgs }:
+    {
+      self,
+      nixpkgs,
+      pyproject-nix,
+    }:
     let
       systems = [
         "x86_64-linux"
@@ -24,53 +31,19 @@
       packages = forAllSystems (
         { pkgs, system }:
         let
-          dmlpdfclassifyPkg =
-            (pkgs.python312Packages.buildPythonPackage {
-              pname = "dml-pdfclassify";
-              version = "2025.7.1039";
-              format = "pyproject";
-
-              src = ./.;
-
-              nativeBuildInputs = [ pkgs.poetry ];
-              propagatedBuildInputs = with pkgs.python312Packages; [
-                sentence-transformers
-                pdfminer-six
-                joblib
-                numpy
-                platformdirs
-                pypdf
-                poetry-core
-              ];
-
-              pythonImportsCheck = [ "pdfclassify.pdfclassify" ];
-
-              meta = {
-                description = "Set of command-line tools (dml-pdfclassify)";
-                homepage = "https://github.com/dmlane/dml-pdfclassify";
-                license = pkgs.lib.licenses.mit;
-              };
-            }).overrideAttrs
-              (_: {
-                outputs = [ "out" ];
-                pythonOutputDistPhase = "echo 'Skipping dist phase'";
-                installCheckPhase = "true";
-              });
+          project = pyproject-nix.lib.project.loadPoetryPyproject ./.;
         in
         {
-          default = dmlpdfclassifyPkg;
-          dml-pdfclassify = dmlpdfclassifyPkg;
+          default = project;
+          dml-pdfclassify = project;
         }
       );
 
       devShells = forAllSystems (
-        { pkgs, ... }:
+        { pkgs, system }:
         {
           default = pkgs.mkShell {
-            buildInputs = [
-              pkgs.poetry
-              pkgs.python312
-            ];
+            inputsFrom = [ self.packages.${system}.default ];
           };
         }
       );

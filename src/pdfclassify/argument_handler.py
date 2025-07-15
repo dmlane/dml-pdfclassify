@@ -29,7 +29,7 @@ def get_version() -> str:
     """Lazy import of package version to speed up CLI loading."""
     from importlib.metadata import version  # pylint: disable=import-outside-toplevel
 
-    return version("pdfclassify")
+    return version("dml-pdfclassify")
 
 
 @dataclass

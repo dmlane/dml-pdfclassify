@@ -19,7 +19,7 @@ packages = [
 [tool.poetry.dependencies]
 python = ">=3.12,<3.13"
 sentence-transformers = "^4.1.0"
-pdfminer-six = "^20250416"
+pdfminer-six = ">=20240706"
 joblib = "^1.4.2"
 numpy = "^2.2.5"
 platformdirs = "^4.3.7"
