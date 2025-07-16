@@ -30,19 +30,18 @@
           project = pyproject-nix.lib.project.loadPyproject {
             projectRoot = ./.;
           };
-          attrs = project.renderers.buildPythonPackage { inherit python; };
+
+          base = project.renderers.buildPythonPackage { inherit python; };
+
+          mergedAttrs = base // {
+            outputs = [ "out" ];
+            meta.outputsToInstall = [ "out" ];
+            dontUseWheel = true;
+            disabledBuildHooks = (base.disabledBuildHooks or [ ]) ++ [ "pypaBuildHook" ];
+          };
         in
         {
-          default = python.pkgs.buildPythonPackage (
-            attrs
-            // {
-              # Ensure only 'out' is generated, not '-dist'
-              outputs = [ "out" ];
-              meta.outputsToInstall = [ "out" ];
-              dontUseWheel = true;
-              disabledBuildHooks = [ "pypaBuildHook" ]; # <- key addition
-            }
-          );
+          default = python.pkgs.buildPythonPackage mergedAttrs;
         }
       );
 
