@@ -38,6 +38,7 @@
             // {
               # Prevent extra -dist output
               meta.outputsToInstall = [ "out" ];
+              dontUseWheel = true;
             }
           );
         }
