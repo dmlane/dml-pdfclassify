@@ -1,6 +1,6 @@
 [project]
 name = "dml-pdfclassify"
-version = "2025.05.24"
+version = "2025.5.24"
 description = "PDF classifier based on content etc"
 authors = [{ name = "Dave Lane", email = "cheery.koala5370@fastmail.com" }]
 license = { text = "MIT" }
@@ -80,9 +80,9 @@ push = true
     '^version = "{version}"',
     '^current_version = "{version}"',
 ]
-"flake.nix" = [
-  'version = "{version}";'
-]
+#"flake.nix" = [
+#  'version = "{version}";'
+#]
 
 [tool.isort]
 profile = "black"
