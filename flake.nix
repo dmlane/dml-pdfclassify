@@ -36,10 +36,11 @@
           default = python.pkgs.buildPythonPackage (
             attrs
             // {
-              # Prevent extra -dist output
+              # Ensure only 'out' is generated, not '-dist'
               outputs = [ "out" ];
               meta.outputsToInstall = [ "out" ];
               dontUseWheel = true;
+              disabledBuildHooks = [ "pypaBuildHook" ]; # <- key addition
             }
           );
         }
