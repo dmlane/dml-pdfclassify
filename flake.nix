@@ -3,7 +3,8 @@
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-25.05";
-    pyproject-nix.url = "github:nix-community/pyproject.nix";
+    pyproject-nix.url = "github:pyproject-nix/pyproject.nix";
+    pyproject-nix.inputs.nixpkgs.follows = "nixpkgs";
   };
 
   outputs =
@@ -11,44 +12,46 @@
       self,
       nixpkgs,
       pyproject-nix,
+      ...
     }:
     let
       systems = [
         "x86_64-linux"
         "aarch64-darwin"
       ];
-      forAllSystems =
-        f:
-        nixpkgs.lib.genAttrs systems (
-          system:
-          f {
-            pkgs = import nixpkgs { inherit system; };
-            system = system;
-          }
-        );
+      forAllSystems = nixpkgs.lib.genAttrs systems;
     in
     {
       packages = forAllSystems (
-        { pkgs, system }:
+        system:
         let
-          project = pyproject-nix.lib.project.loadPoetryPyproject {
-            projectDir = ./.;
+          pkgs = import nixpkgs { inherit system; };
+          python = pkgs.python312;
+          project = pyproject-nix.lib.project.loadPyproject {
+            projectRoot = ./.;
           };
+          attrs = project.renderers.buildPythonPackage { inherit python; };
         in
         {
-          default = project;
-          dml-pdfclassify = project;
+          default = python.pkgs.buildPythonPackage attrs;
         }
       );
 
       devShells = forAllSystems (
-        { pkgs, system }:
+        system:
+        let
+          pkgs = import nixpkgs { inherit system; };
+          python = pkgs.python312;
+          project = pyproject-nix.lib.project.loadPyproject {
+            projectRoot = ./.;
+          };
+          pythonEnv = python.withPackages (project.renderers.withPackages { inherit python; });
+        in
         {
           default = pkgs.mkShell {
-            inputsFrom = [ self.packages.${system}.default ];
-            packages = with pkgs; [
-              poetry
-              python312
+            packages = [
+              pythonEnv
+              pkgs.poetry
             ];
           };
         }

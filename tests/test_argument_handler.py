@@ -84,7 +84,7 @@ def test_default_paths_are_set(monkeypatch) -> None:
 
 def test_version_output(capsys: pytest.CaptureFixture) -> None:
     """Test that the --version flag prints the expected package version and exits."""
-    expected_version = version("pdfclassify")
+    expected_version = version("dml-pdfclassify")
     with pytest.raises(SystemExit):
         ArgumentHandler().parse_args_from(["--version"])
     captured = capsys.readouterr()
