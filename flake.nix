@@ -33,7 +33,13 @@
           attrs = project.renderers.buildPythonPackage { inherit python; };
         in
         {
-          default = python.pkgs.buildPythonPackage attrs;
+          default = python.pkgs.buildPythonPackage (
+            attrs
+            // {
+              # Prevent extra -dist output
+              meta.outputsToInstall = [ "out" ];
+            }
+          );
         }
       );
 
