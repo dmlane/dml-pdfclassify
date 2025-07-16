@@ -37,6 +37,7 @@
             attrs
             // {
               # Prevent extra -dist output
+              outputs = [ "out" ];
               meta.outputsToInstall = [ "out" ];
               dontUseWheel = true;
             }
