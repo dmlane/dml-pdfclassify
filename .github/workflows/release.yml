@@ -4,6 +4,8 @@ on:
   push:
     tags:
       - '*'  # Trigger for all version tags
+permissions:
+  contents: write
 
 jobs:
   build:
