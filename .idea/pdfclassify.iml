@@ -6,7 +6,7 @@
       <sourceFolder url="file://$MODULE_DIR$/tests" isTestSource="true" />
       <sourceFolder url="file://$MODULE_DIR$/src/pdfclassify" isTestSource="false" />
     </content>
-    <orderEntry type="jdk" jdkName="Python 3.12 virtualenv at ~/.pyenv/versions/pdfclassify" jdkType="Python SDK" />
+    <orderEntry type="jdk" jdkName="Poetry (pdfclassify)" jdkType="Python SDK" />
     <orderEntry type="sourceFolder" forTests="false" />
   </component>
 </module>
