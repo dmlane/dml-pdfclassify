@@ -30,18 +30,11 @@
           project = pyproject-nix.lib.project.loadPyproject {
             projectRoot = ./.;
           };
-
-          base = project.renderers.buildPythonPackage { inherit python; };
-
-          mergedAttrs = base // {
-            outputs = [ "out" ];
-            meta.outputsToInstall = [ "out" ];
-            dontUseWheel = true;
-            disabledBuildHooks = (base.disabledBuildHooks or [ ]) ++ [ "pypaBuildHook" ];
-          };
+          attrs = project.renderers.buildPythonPackage { inherit python; };
         in
         {
-          default = python.pkgs.buildPythonPackage mergedAttrs;
+          default = python.pkgs.buildPythonPackage attrs;
+          dml-pdfclassify = python.pkgs.buildPythonPackage attrs;
         }
       );
 
