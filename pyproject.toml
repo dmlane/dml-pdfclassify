@@ -1,6 +1,6 @@
 [project]
 name = "dml-pdfclassify"
-version = "2025.7.1049"
+version = "2025.7.1050"
 description = "PDF classifier based on content etc"
 authors = [{ name = "Dave Lane", email = "cheery.koala5370@fastmail.com" }]
 license = { text = "MIT" }
@@ -68,7 +68,7 @@ line_length = 100
 target-version = ['py312']
 
 [tool.bumpver]
-current_version = "2025.7.1049"
+current_version = "2025.7.1050"
 version_pattern = "YYYY.MM.BUILD[-PYTAGNUM]"
 commit_message = "bump version {old_version} -> {new_version}"
 commit = true
