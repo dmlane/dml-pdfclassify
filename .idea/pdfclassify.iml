@@ -5,6 +5,8 @@
       <sourceFolder url="file://$MODULE_DIR$/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/tests" isTestSource="true" />
       <sourceFolder url="file://$MODULE_DIR$/src/pdfclassify" isTestSource="false" />
+      <excludeFolder url="file://$MODULE_DIR$/.venv" />
+      <excludeFolder url="file://$MODULE_DIR$/result" />
     </content>
     <orderEntry type="jdk" jdkName="Poetry (pdfclassify)" jdkType="Python SDK" />
     <orderEntry type="sourceFolder" forTests="false" />
