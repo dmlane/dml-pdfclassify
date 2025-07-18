@@ -13,7 +13,6 @@ dependencies = [
   "joblib>=1.4.2",
   "numpy>=2.2.5",
   "platformdirs>=4.3.7",
-  "pypdf>=5.4.0"
 ]
 
 [project.urls]
@@ -62,6 +61,7 @@ pytest-resource-path = ">=1.3.0"
 setuptools = ">=68.0.0"
 mock = ">=5.1.0"
 fpdf = "^1.7.2"
+pypdf = "^5.8.0"
 
 [tool.black]
 line_length = 100
@@ -80,9 +80,6 @@ push = true
     '^version = "{version}"',
     '^current_version = "{version}"',
 ]
-#"flake.nix" = [
-#  'version = "{version}";'
-#]
 
 [tool.isort]
 profile = "black"

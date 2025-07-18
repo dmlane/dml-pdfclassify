@@ -1,5 +1,5 @@
 # pylint: disable=redefined-outer-name, too-few-public-methods
-"""Test PdfProcess.restore_original_state()."""
+"""Test PdfProcess sidecar metadata preservation and retrieval."""
 
 import os
 from datetime import datetime
@@ -8,12 +8,12 @@ from pathlib import Path
 import pytest
 from fpdf import FPDF
 
-from pdfclassify.pdf_process import PdfProcess
+from pdfclassify.pdf_metadata_manager import PDFMetadataManager
 
 
 @pytest.fixture
 def dummy_pdf(tmp_path: Path) -> Path:
-    """Create a dummy PDF with known timestamp."""
+    """Create a dummy PDF with known timestamp and name."""
     pdf_path = tmp_path / "original_name.pdf"
     pdf = FPDF()
     pdf.add_page()
@@ -27,28 +27,29 @@ def dummy_pdf(tmp_path: Path) -> Path:
     return pdf_path
 
 
-def test_restore_original_state(valid_pdf_file: Path, tmp_path: Path) -> None:
-    """Ensure PdfProcess can restore the original name and timestamp."""
-    process = PdfProcess(str(valid_pdf_file))
-    original_name = valid_pdf_file.name
-    original_mod_time = os.path.getmtime(valid_pdf_file)
+def test_sidecar_original_metadata(dummy_pdf: Path, tmp_path: Path) -> None:
+    """
+    Ensure original name and timestamp are correctly stored in the sidecar and retrievable,
+    even after renaming and touching the file.
+    """
+    original_name = dummy_pdf.name
+    original_mod_time = dummy_pdf.stat().st_mtime
+    iso_date = datetime.fromtimestamp(original_mod_time).isoformat()
 
-    # Move and rename file
-    new_path = tmp_path / "renamed.pdf"
-    valid_pdf_file.rename(new_path)
-    assert new_path.name != original_name
+    # Write original metadata
+    manager = PDFMetadataManager(dummy_pdf)
+    manager.write_custom_field("/Original_Filename", original_name)
+    manager.write_custom_field("/Original_Date", iso_date)
 
-    # Change timestamp
-    os.utime(new_path, None)
-    assert os.path.getmtime(new_path) != original_mod_time
+    # Rename PDF and sidecar together
+    renamed_path = tmp_path / "renamed.pdf"
+    manager.rename_with_sidecar(renamed_path)
 
-    # Restore state
-    process = PdfProcess(str(new_path))
-    process.restore_original_state()
+    # Modify timestamp after rename
+    os.utime(renamed_path, None)
 
-    restored_path = new_path.parent / original_name
-    assert restored_path.exists()
-    assert restored_path.name == original_name
-
-    restored_mod_time = os.path.getmtime(restored_path)
-    assert abs(restored_mod_time - original_mod_time) < 1
+    # Reload manager from renamed path and verify metadata
+    manager = PDFMetadataManager(renamed_path)
+    assert manager.read_custom_field("/Original_Filename") == "original_name.pdf"
+    assert manager.read_custom_field("/Original_Date") == iso_date
+    assert manager.verify_pdf_hash() is True

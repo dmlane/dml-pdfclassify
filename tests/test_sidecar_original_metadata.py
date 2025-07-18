@@ -1,13 +1,11 @@
-"""Tests for the PDFMetadataManager class."""
+"""Tests for the PDFMetadataManager class using sidecar metadata."""
 
 # pylint: disable=redefined-outer-name
 
-import os
-import time
+import json
 from pathlib import Path
 
 import pytest
-from pypdf import PdfReader, PdfWriter
 
 from pdfclassify.pdf_metadata_manager import PDFMetadataManager
 
@@ -35,18 +33,14 @@ def test_delete_custom_metadata(valid_pdf_file: Path) -> None:
     assert manager.read_custom_field("/Original_Filename") is None
 
 
-def test_timestamps_are_preserved(valid_pdf_file: Path) -> None:
-    """Ensure file modification times are preserved after update."""
-    original_stat = os.stat(valid_pdf_file)
-    original_mtime = original_stat.st_mtime
-
-    time.sleep(1)  # Ensure filesystem time delta
+def test_pdf_file_not_modified(valid_pdf_file: Path) -> None:
+    """Ensure PDF file content is not modified when writing metadata."""
+    original_content = valid_pdf_file.read_bytes()
 
     manager = PDFMetadataManager(valid_pdf_file)
-    manager.write_custom_field("/Classification", "timestamp-test")
+    manager.write_custom_field("/Classification", "unchanged-test")
 
-    new_stat = os.stat(valid_pdf_file)
-    assert new_stat.st_mtime == original_mtime
+    assert valid_pdf_file.read_bytes() == original_content
 
 
 def test_print_metadata_smoke(valid_pdf_file: Path, capsys: pytest.CaptureFixture) -> None:
@@ -62,31 +56,22 @@ def test_print_metadata_smoke(valid_pdf_file: Path, capsys: pytest.CaptureFixtur
     assert "invoice" in captured.out.lower()
 
 
-def test_mod_date_preserved_format(valid_pdf_file: Path) -> None:
-    """Ensure that /ModDate is preserved and formatted properly."""
-    # Manually write a PDF with a ModDate field
-    writer = PdfWriter()
-    writer.add_blank_page(width=72, height=72)
-    writer.add_metadata({"/ModDate": "D:20240508120000"})
-    with open(valid_pdf_file, "wb") as f:
-        writer.write(f)
-
-    # Confirm the ModDate was written
-    reader = PdfReader(valid_pdf_file)
-    assert reader.metadata.get("/ModDate") == "D:20240508120000"
-
-    # Now use your manager and trigger a write action
-    manager = PDFMetadataManager(valid_pdf_file)
-    manager.write_custom_field("/TestField", "Value")
-
-    # Confirm the ModDate still exists after the update
-    mod_date = manager.read_custom_field("/ModDate")
-    assert mod_date is not None
-    assert mod_date.startswith("D:")
-
-
 def test_write_custom_field_return_value(valid_pdf_file: Path) -> None:
     """Ensure write_custom_field returns True on write and False when skipped."""
     manager = PDFMetadataManager(valid_pdf_file)
     assert manager.write_custom_field("/Foo", "bar") is True
     assert manager.write_custom_field("/Foo", "baz", overwrite=False) is False
+
+
+def test_sidecar_file_content(valid_pdf_file: Path) -> None:
+    """Ensure sidecar file contains expected JSON structure."""
+    manager = PDFMetadataManager(valid_pdf_file)
+    manager.write_custom_field("/Classification", "invoice")
+
+    sidecar_path = valid_pdf_file.with_suffix(valid_pdf_file.suffix + ".meta.json")
+    assert sidecar_path.exists()
+
+    with sidecar_path.open("r", encoding="utf-8") as f:
+        data = json.load(f)
+
+    assert data.get("/Classification") == "invoice"

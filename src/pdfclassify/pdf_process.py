@@ -35,8 +35,7 @@ class PdfProcess:
             if size == 0 and "com.apple.placeholder" in xattrs:
                 raise MyException(f"Skipping zero-length placeholder PDF: {pdf_path}", 4)
         except OSError:
-            # ignore stat errors
-            pass
+            pass  # ignore stat errors
 
         # Save original metadata
         try:
@@ -63,14 +62,18 @@ class PdfProcess:
             raise MyException(f"Unexpected error during metadata save: {e}", 3) from e
 
     def restore_original_state(self) -> None:
-        """Restore filename and timestamp from metadata fields."""
+        """Restore filename and timestamp from sidecar metadata fields."""
         pdf_manager = PDFMetadataManager(self.pdf_file)
+
         orig_name = pdf_manager.read_custom_field("/Original_Filename")
         orig_date = pdf_manager.read_custom_field("/Original_Date")
-        if orig_name:
-            new_path = self.pdf_file.with_name(Path(orig_name).name)
-            self.pdf_file.rename(new_path)
-            self.pdf_file = new_path
+
+        # Rename file (and sidecar) if original name is present
+        if orig_name and orig_name != self.pdf_file.name:
+            new_path = self.pdf_file.with_name(orig_name)
+            self.pdf_file = pdf_manager.rename_with_sidecar(new_path)
+
+        # Restore timestamp if present
         if orig_date:
             ts = datetime.fromisoformat(orig_date).timestamp()
             os.utime(self.pdf_file, (ts, ts))
@@ -106,36 +109,37 @@ class PdfProcess:
                 field_name="/Classification", value=label.label, overwrite=True
             )
         new_path = self.take_action(
-            file_name=self.pdf_file,
             prediction=label,
             rename=not args.no_rename,
-            output_path=Path(args.output_path),
+            output_path=Path(args.output_path) if args.output_path else None,
         )
         if new_path:
             print(f"File moved to: {new_path}")
 
     def take_action(
         self,
-        file_name: Path,
         prediction: Classification,
         rename: bool = True,
-        output_path: Path = None,
+        output_path: Path | None = None,
     ) -> Path | None:
         """Rename/move file based on classification success or rejects."""
         if not rename:
             return None
+
         suffix = ".pdf"
         if prediction.success:
-            base = output_path or file_name.parent
+            base = output_path or self.pdf_file.parent
             stem = prediction.label
         else:
-            base = file_name.parent / "pdfclassify.rejects"
-            stem = file_name.stem
+            base = self.pdf_file.parent / "pdfclassify.rejects"
+            stem = self.pdf_file.stem
+
         base.mkdir(parents=True, exist_ok=True)
         dest = base / f"{stem}{suffix}"
         counter = 1
         while dest.exists():
             dest = base / f"{stem}_{counter}{suffix}"
             counter += 1
-        shutil.move(str(file_name), dest)
+
+        shutil.move(str(self.pdf_file), dest)
         return dest

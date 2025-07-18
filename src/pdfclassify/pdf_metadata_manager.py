@@ -1,59 +1,71 @@
-"""Module for managing PDF custom metadata with date retention."""
+"""Module for managing sidecar metadata for PDFs using a JSON file."""
 
-import os
+import hashlib
+import json
 from dataclasses import dataclass, fields
-from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
-from pypdf import PdfReader, PdfWriter
-from pypdf.generic import NameObject, TextStringObject
-
-
-def _format_pdf_date(dt_str: str) -> str:
-    if dt_str.startswith("D:") and len(dt_str) >= 16:
-        # Already PDF-style format: return as-is to avoid corruption
-        return dt_str
-    # Assume ISO format and convert
-    dt = datetime.fromisoformat(dt_str)
-    return f"D:{dt.strftime('%Y%m%d%H%M%S')}"
+from pypdf import PdfReader
+from pypdf.errors import PdfReadError
 
 
 @dataclass
 class MyMetadata:
-    """My custom metadata for PDF files."""
+    """Custom metadata for PDF sidecar files."""
 
     classification: Optional[str] = None
     original_file_name: Optional[str] = None
     original_date: Optional[str] = None
+    sha256: Optional[str] = None
 
 
 class PDFMetadataManager:
-    """Manage custom metadata fields in PDF files while preserving timestamps."""
+    """
+    Manage custom metadata for a PDF via a sidecar JSON file.
+
+    Sidecar is stored as <filename>.meta.json alongside the PDF.
+    """
 
     def __init__(self, input_path: Path) -> None:
         self.input_path = input_path
-        self.reader = PdfReader(input_path)
-        self.mod_date = self.reader.metadata.get("/ModDate")
-        self._original_stat = os.stat(input_path)
+        self.sidecar_path = input_path.with_suffix(input_path.suffix + ".meta.json")
+
+        try:
+            PdfReader(str(input_path))
+        except Exception as e:
+            raise PdfReadError(f"Invalid PDF file: {input_path}") from e
+
+    def _calculate_pdf_hash(self) -> str:
+        """Calculate SHA-256 hash of the PDF file."""
+        hasher = hashlib.sha256()
+        with self.input_path.open("rb") as f:
+            for chunk in iter(lambda: f.read(8192), b""):
+                hasher.update(chunk)
+        return hasher.hexdigest()
 
     def _load_metadata(self) -> dict:
-        return PdfReader(self.input_path).metadata or {}
+        if self.sidecar_path.exists():
+            with self.sidecar_path.open("r", encoding="utf-8") as f:
+                return json.load(f)
+        return {}
+
+    def _save_metadata(self, metadata: dict) -> None:
+        """Save metadata to the sidecar file."""
+        metadata["/Sha256"] = self._calculate_pdf_hash()
+        with self.sidecar_path.open("w", encoding="utf-8") as f:
+            json.dump(metadata, f, indent=2, ensure_ascii=False)
 
     def print_metadata(self) -> None:
-        """Print the metadata of the PDF in a visually enhanced format."""
+        """Print the metadata in a visually enhanced format."""
         bold = "\033[1m"
         reset = "\033[0m"
         dim = "\033[2m"
         cyan = "\033[36m"
 
-        metadata = MyMetadata(
-            classification=self.read_custom_field("/Classification"),
-            original_file_name=self.read_custom_field("/Original_Filename"),
-            original_date=self.read_custom_field("/Original_Date"),
-        )
+        metadata = self.get_structured_metadata()
 
-        print(f"{bold}Custom metadata for {self.input_path}:{reset}")
+        print(f"{bold}Custom metadata for {self.input_path.name}:{reset}")
         print("-" * 40)
 
         max_len = max(len(f.name) for f in fields(metadata))
@@ -63,15 +75,25 @@ class PDFMetadataManager:
             display = str(value) if value is not None else f"{dim}–{reset}"
             print(f"{cyan}{name}{reset} : {display}")
 
+    def get_structured_metadata(self) -> MyMetadata:
+        """Load sidecar metadata into a structured dataclass."""
+        data = self._load_metadata()
+        return MyMetadata(
+            **{
+                f.name: data.get("/" + f.name.replace("_", " ").title().replace(" ", "_"))
+                for f in fields(MyMetadata)
+            }
+        )
+
     def read_custom_field(self, field_name: str) -> Optional[str]:
         """
-        Read a custom metadata field from the PDF.
+        Read a custom field from the sidecar.
 
         Args:
-            field_name (str): The name of the metadata field (e.g., "/Classification").
+            field_name (str): Field name (e.g., "/Classification")
 
         Returns:
-            Optional[str]: The value of the field, or None if not found.
+            Optional[str]: The value, or None if missing
         """
         return self._load_metadata().get(field_name)
 
@@ -79,68 +101,69 @@ class PDFMetadataManager:
         self,
         field_name: str,
         value: str,
-        output_path: Optional[Path] = None,
         overwrite: bool = True,
     ) -> bool:
         """
-        Write or update a custom metadata field in the PDF.
+        Write or update a custom metadata field in the sidecar.
 
         Args:
-            field_name (str): The name of the metadata field.
-            value (str): The value to assign to the field.
-            output_path (Optional[Path]): Path to save the updated PDF. Overwrites original if None.
-            overwrite (bool): If False, do not overwrite field if it already exists.
+            field_name (str): The name of the field (e.g., "/Classification")
+            value (str): The value to set
+            overwrite (bool): If False, will skip writing if field exists
+
+        Returns:
+            bool: True if written, False if skipped
         """
-        current_metadata = self._load_metadata()
-        if not overwrite and field_name in current_metadata:
+        metadata = self._load_metadata()
+        if not overwrite and field_name in metadata:
             return False
-        save_path = output_path or self.input_path
-        self._update_metadata({field_name: value}, save_path, override=False)
+        metadata[field_name] = value
+        self._save_metadata(metadata)
         return True
 
-    def delete_custom_field(self, field_name: str, output_path: Optional[Path] = None) -> None:
+    def delete_custom_field(self, field_name: str) -> None:
         """
-        Delete a custom metadata field from the PDF.
+        Delete a field from the sidecar metadata, if present.
 
         Args:
-            field_name (str): The name of the field to delete.
-            output_path (Optional[Path]): Path to save the updated PDF. Overwrites original if None.
+            field_name (str): The field name to delete
         """
-        current_metadata = self._load_metadata()
-        if field_name not in current_metadata:
-            return
-        updated_metadata = current_metadata.copy()
-        updated_metadata.pop(field_name, None)
-        save_path = output_path or self.input_path
-        self._update_metadata(updated_metadata, save_path, override=True)
+        metadata = self._load_metadata()
+        if field_name in metadata:
+            metadata.pop(field_name)
+            self._save_metadata(metadata)
 
-    def _update_metadata(
-        self, new_data: dict[str, str], save_path: Path, override: bool = False
-    ) -> None:
-        writer = PdfWriter()
-        reader = PdfReader(self.input_path)  # Re-read to avoid stale state
-        writer.append_pages_from_reader(reader)
+    def rename_with_sidecar(self, new_name: str | Path) -> Path:
+        """
+        Rename the PDF and its sidecar file to match the new name.
+        Raises an error if the sidecar's hash does not match the PDF.
 
-        metadata = {}
-        if not override:
-            existing_metadata = reader.metadata or {}
-            metadata.update(
-                {
-                    NameObject(k): TextStringObject(str(v))
-                    for k, v in existing_metadata.items()
-                    if isinstance(k, str) and v is not None
-                }
-            )
+        Args:
+            new_name (str | Path): New file name (e.g., 'invoice.pdf')
 
-        for k, v in new_data.items():
-            metadata[NameObject(k)] = TextStringObject(str(v))
+        Returns:
+            Path: The new path to the renamed PDF
+        """
+        new_name = Path(new_name).with_suffix(".pdf")
+        new_pdf_path = self.input_path.with_name(new_name.name)
+        new_sidecar_path = new_pdf_path.with_suffix(new_pdf_path.suffix + ".meta.json")
 
-        if self.mod_date:
-            metadata[NameObject("/ModDate")] = TextStringObject(_format_pdf_date(self.mod_date))
+        # Check sidecar validity before renaming
+        if self.sidecar_path.exists():
+            if not self.verify_pdf_hash():
+                raise ValueError(f"PDF hash does not match metadata in {self.sidecar_path}")
+            self.sidecar_path.rename(new_sidecar_path)
 
-        writer.add_metadata(metadata)
+        self.input_path.rename(new_pdf_path)
 
-        with open(save_path, "wb") as f:
-            writer.write(f)
+        # Update internal state
+        self.input_path = new_pdf_path
+        self.sidecar_path = new_sidecar_path
+        return new_pdf_path
 
-        os.utime(save_path, (self._original_stat.st_atime, self._original_stat.st_mtime))
+    def verify_pdf_hash(self) -> bool:
+        """Verify that the current PDF matches the SHA-256 hash in the sidecar."""
+        stored = self.read_custom_field("/Sha256")
+        if not stored:
+            return False
+        return stored == self._calculate_pdf_hash()
