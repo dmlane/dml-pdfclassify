@@ -1,4 +1,4 @@
-""" ""Interactive CLI for managing label_boosts.json configuration."""
+"""Interactive CLI for managing label_boosts.json configuration."""
 
 import ast
 import json
@@ -72,13 +72,7 @@ class LabelBoostCLI:
             raw_output = result.stdout.strip()
             try:
                 parsed = ast.literal_eval(raw_output)
-                groups = []
-                for g in parsed:
-                    if isinstance(g, str):
-                        unquoted = g.strip()
-                        if unquoted.startswith('"') and unquoted.endswith('"'):
-                            unquoted = unquoted[1:-1]
-                        groups.append(unquoted)
+                groups = [g.strip('"') for g in parsed if isinstance(g, str)]
             except ValueError:
                 print("⚠️ Failed to parse AppleScript result. Raw output:")
                 print(raw_output)
@@ -123,8 +117,8 @@ class LabelBoostCLI:
                 self.config[label] = {
                     "boost_phrases": [],
                     "boost": 0.0,
-                    "final_name_pattern": "",
-                    "devonthink_group": "",
+                    "final_name_pattern": None,
+                    "devonthink_group": None,
                 }
 
         removed = [label for label in self.config if label not in existing_labels]
@@ -139,20 +133,20 @@ class LabelBoostCLI:
                 print("✅ Stale entries removed.")
 
     def _maybe_refresh_devonthink_groups(self) -> None:
-        """Ask once per session if the user wants to refresh the DEVONthink group list."""
-        refresh = questionary.confirm(
-            "Refresh DEVONthink group list from DEVONthink now?", default=False, style=CUSTOM_STYLE
-        ).ask()
-        if refresh:
-            self._get_devonthink_groups(force_refresh=True)
-        else:
-            self._get_devonthink_groups(force_refresh=False)
+        """Prompt the user to refresh DEVONthink groups once per session."""
+        if not self._get_devonthink_groups():
+            refresh = questionary.confirm(
+                "Refresh DEVONthink group list?", style=CUSTOM_STYLE
+            ).ask()
+            if refresh:
+                self._get_devonthink_groups(force_refresh=True)
 
     def _is_complete(self, label: str) -> bool:
         """Return whether a label's configuration is complete."""
         entry = self.config[label]
         return all(
-            field in entry and isinstance(entry[field], (str, list, float)) and entry[field] != ""
+            field in entry
+            and (entry[field] is None or isinstance(entry[field], (str, list, float)))
             for field in REQUIRED_FIELDS
         )
 
@@ -180,23 +174,26 @@ class LabelBoostCLI:
         ).ask()
         entry["boost"] = float(boost)
 
-        entry["final_name_pattern"] = questionary.text(
+        pattern = questionary.text(
             "Final name pattern", default=entry.get("final_name_pattern") or "", style=CUSTOM_STYLE
         ).ask()
+        entry["final_name_pattern"] = pattern or None
 
         dt_groups = self._get_devonthink_groups()
         if dt_groups:
-            entry["devonthink_group"] = questionary.autocomplete(
+            devon_group = questionary.autocomplete(
                 "Devonthink group (type to filter):",
                 choices=dt_groups,
                 default=entry.get("devonthink_group") or "",
                 style=CUSTOM_STYLE,
             ).ask()
+            entry["devonthink_group"] = devon_group or None
         else:
             print("⚠️ DEVONthink group list unavailable. Please enter manually.")
-            entry["devonthink_group"] = questionary.text(
+            devon_group = questionary.text(
                 "Devonthink group", default=entry.get("devonthink_group") or "", style=CUSTOM_STYLE
             ).ask()
+            entry["devonthink_group"] = devon_group or None
 
         self.config[label] = entry
         self._save_config()
@@ -243,6 +240,12 @@ class LabelBoostCLI:
                 if result == "__back__" or result is None:
                     break
                 self._edit_label(result)
+
+
+def main() -> None:
+    """Entry point for CLI."""
+
+    LabelBoostCLI().run()
 
 
 if __name__ == "__main__":
