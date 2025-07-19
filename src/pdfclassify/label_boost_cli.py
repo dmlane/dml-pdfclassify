@@ -4,32 +4,32 @@ import ast
 import json
 import subprocess
 import sys
-from typing import Any, Dict, List
+from typing import List
 
 import questionary
 from prompt_toolkit.styles import Style
 
 from pdfclassify._util import CONFIG  # pylint: disable=no-name-in-module
+from pdfclassify.label_boost_manager import LabelBoostManager
 
 # Custom style for better contrast
 CUSTOM_STYLE = Style.from_dict(
     {
-        "question": "#00ffff bold",  # Cyan
-        "answer": "#ffffff",  # White
-        "pointer": "#00ff00 bold",  # Green
-        "highlighted": "#00ff00 bold",  # Green for selected
-        "selected": "#00ff00 bold",  # Green
+        "question": "#00ffff bold",
+        "answer": "#ffffff",
+        "pointer": "#00ff00 bold",
+        "highlighted": "#00ff00 bold",
+        "selected": "#00ff00 bold",
         "instruction": "#888888 italic",
         "separator": "#cc5454",
         "text": "#ffffff",
     }
 )
 
-REQUIRED_FIELDS = ["boost_phrases", "boost", "final_name_pattern", "devonthink_group"]
 CACHE_PATH = CONFIG.cache_dir / "devonthink_groups.json"
+REQUIRED_FIELDS = ["boost_phrases", "boost", "final_name_pattern", "devonthink_group"]
 
 
-# pylint: disable=too-few-public-methods
 class LabelBoostCLI:
     """Interactive CLI for editing the label_boosts.json config."""
 
@@ -88,71 +88,29 @@ class LabelBoostCLI:
             return []
 
     def __init__(self) -> None:
-        self.config_path = CONFIG.label_config_path
-        self.training_dir = CONFIG.training_data_dir
-        self.config: Dict[str, Dict[str, Any]] = self._load_config()
-        self._sync_labels()
+        self.boosts = LabelBoostManager()
+        self.config = self.boosts.config
+
+        if self.boosts.missing_labels():
+            print("🔄 New training labels detected.")
+            self.boosts.sync_with_training_labels(interactive=True)
+            self.config = self.boosts.config
+            self.boosts.save()
+
         self._maybe_refresh_devonthink_groups()
 
-    def _load_config(self) -> Dict[str, Dict[str, Any]]:
-        """Load the label_boosts.json configuration file."""
-        if self.config_path.exists():
-            try:
-                with open(self.config_path, "r", encoding="utf-8") as file:
-                    return json.load(file)
-            except (OSError, json.JSONDecodeError):
-                print("⚠️  Failed to parse config. Starting with empty config.")
-        return {}
-
     def _save_config(self) -> None:
-        """Write the label configuration to disk."""
-        with open(self.config_path, "w", encoding="utf-8") as file:
-            json.dump(self.config, file, indent=2, ensure_ascii=False)
-
-    def _sync_labels(self) -> None:
-        """Ensure config entries exist for all training labels, and optionally remove stale ones."""
-        existing_labels = {p.name for p in self.training_dir.iterdir() if p.is_dir()}
-        for label in sorted(existing_labels):
-            if label not in self.config:
-                self.config[label] = {
-                    "boost_phrases": [],
-                    "boost": 0.0,
-                    "final_name_pattern": None,
-                    "devonthink_group": None,
-                }
-
-        removed = [label for label in self.config if label not in existing_labels]
-        if removed:
-            print(f"🧹 Found stale config entries: {', '.join(removed)}")
-            confirm = questionary.confirm(
-                "Remove these entries from config?", style=CUSTOM_STYLE
-            ).ask()
-            if confirm:
-                for label in removed:
-                    del self.config[label]
-                print("✅ Stale entries removed.")
+        self.boosts.save()
 
     def _maybe_refresh_devonthink_groups(self) -> None:
-        """Prompt the user to optionally refresh DEVONthink groups once per session."""
-        refresh = questionary.confirm(
-            "Refresh DEVONthink group list?", default=False, style=CUSTOM_STYLE
-        ).ask()
-        if refresh:
-            self._get_devonthink_groups(force_refresh=True)
-        else:
-            self._get_devonthink_groups(force_refresh=False)
-
-    def _is_complete(self, label: str) -> bool:
-        """Return whether a label's configuration is complete."""
-        entry = self.config[label]
-        return all(
-            field in entry
-            and (entry[field] is None or isinstance(entry[field], (str, list, float)))
-            for field in REQUIRED_FIELDS
-        )
+        if not self._get_devonthink_groups():
+            refresh = questionary.confirm(
+                "Refresh DEVONthink group list?", style=CUSTOM_STYLE
+            ).ask()
+            if refresh:
+                self._get_devonthink_groups(force_refresh=True)
 
     def _edit_label(self, label: str) -> None:
-        """Prompt user to edit a label's configuration."""
         if label not in self.config:
             print(f"⚠️  Unknown label selected: {label}")
             return
@@ -167,16 +125,19 @@ class LabelBoostCLI:
         ).ask()
         entry["boost_phrases"] = [p.strip() for p in phrases.split(",") if p.strip()]
 
+        boost_default = "0.0" if entry.get("boost") == -1.0 else str(entry.get("boost", "0.0"))
         boost = questionary.text(
             "Boost (0.0 to 1.0)",
-            default=str(entry.get("boost") or "0.0"),
+            default=boost_default,
             validate=lambda x: x.replace(".", "", 1).isdigit() or "Must be a float",
             style=CUSTOM_STYLE,
         ).ask()
         entry["boost"] = float(boost)
 
         pattern = questionary.text(
-            "Final name pattern", default=entry.get("final_name_pattern") or "", style=CUSTOM_STYLE
+            "Final name pattern",
+            default=entry.get("final_name_pattern") or "",
+            style=CUSTOM_STYLE,
         ).ask()
         entry["final_name_pattern"] = pattern or None
 
@@ -192,7 +153,9 @@ class LabelBoostCLI:
         else:
             print("⚠️ DEVONthink group list unavailable. Please enter manually.")
             devon_group = questionary.text(
-                "Devonthink group", default=entry.get("devonthink_group") or "", style=CUSTOM_STYLE
+                "Devonthink group",
+                default=entry.get("devonthink_group") or "",
+                style=CUSTOM_STYLE,
             ).ask()
             entry["devonthink_group"] = devon_group or None
 
@@ -201,7 +164,6 @@ class LabelBoostCLI:
         print("✅ Saved.")
 
     def run(self) -> None:
-        """Run the menu-driven CLI."""
         while True:
             filter_mode = questionary.select(
                 "What do you want to show?",
@@ -217,7 +179,7 @@ class LabelBoostCLI:
                 break
 
             filtered_labels = (
-                [label for label in sorted(self.config) if not self._is_complete(label)]
+                [label for label in sorted(self.config) if not self.boosts.is_complete(label)]
                 if filter_mode == "incomplete"
                 else sorted(self.config)
             )
@@ -229,7 +191,8 @@ class LabelBoostCLI:
             while True:
                 choices = [
                     questionary.Choice(
-                        title=f"{'✅' if self._is_complete(label) else '❌'} {label}", value=label
+                        title=f"{'✅' if self.boosts.is_complete(label) else '❌'} {label}",
+                        value=label,
                     )
                     for label in filtered_labels
                 ]
@@ -244,14 +207,12 @@ class LabelBoostCLI:
 
 
 def main() -> None:
-    """Entry point for CLI."""
-
-    LabelBoostCLI().run()
-
-
-if __name__ == "__main__":
     try:
         LabelBoostCLI().run()
     except KeyboardInterrupt:
         print("\n👋 Exiting.")
         sys.exit(0)
+
+
+if __name__ == "__main__":
+    main()
