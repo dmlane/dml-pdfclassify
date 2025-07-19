@@ -4,8 +4,9 @@ import hashlib
 import json
 from dataclasses import dataclass, fields
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Union
 
+import numpy as np
 from pypdf import PdfReader
 from pypdf.errors import PdfReadError
 
@@ -17,6 +18,7 @@ class MyMetadata:
     classification: Optional[str] = None
     original_file_name: Optional[str] = None
     original_date: Optional[str] = None
+    confidence: Optional[float] = None
     sha256: Optional[str] = None
 
 
@@ -85,7 +87,7 @@ class PDFMetadataManager:
             }
         )
 
-    def read_custom_field(self, field_name: str) -> Optional[str]:
+    def read_custom_field(self, field_name: str) -> Optional[Union[str, float, int]]:
         """
         Read a custom field from the sidecar.
 
@@ -100,7 +102,7 @@ class PDFMetadataManager:
     def write_custom_field(
         self,
         field_name: str,
-        value: str,
+        value: str | float,
         overwrite: bool = True,
     ) -> bool:
         """
@@ -117,6 +119,13 @@ class PDFMetadataManager:
         metadata = self._load_metadata()
         if not overwrite and field_name in metadata:
             return False
+            # Coerce value to native JSON-safe types
+        if isinstance(value, (np.floating, float)):
+            value = float(value)
+        elif isinstance(value, (np.integer, int)):
+            value = int(value)
+        else:
+            value = str(value)
         metadata[field_name] = value
         self._save_metadata(metadata)
         return True
@@ -135,18 +144,20 @@ class PDFMetadataManager:
 
     def rename_with_sidecar(self, new_name: str | Path) -> Path:
         """
-        Rename the PDF and its sidecar file to match the new name.
+        Rename or move the PDF and its sidecar file to match the new name.
         Raises an error if the sidecar's hash does not match the PDF.
 
         Args:
-            new_name (str | Path): New file name (e.g., 'invoice.pdf')
+            new_name (str | Path): New file name or path (e.g., 'invoice.pdf' or '/new/path/invoice.pdf')
 
         Returns:
             Path: The new path to the renamed PDF
         """
-        new_name = Path(new_name).with_suffix(".pdf")
-        new_pdf_path = self.input_path.with_name(new_name.name)
+        new_pdf_path = Path(new_name).with_suffix(".pdf")
         new_sidecar_path = new_pdf_path.with_suffix(new_pdf_path.suffix + ".meta.json")
+
+        # Ensure target directory exists
+        new_pdf_path.parent.mkdir(parents=True, exist_ok=True)
 
         # Check sidecar validity before renaming
         if self.sidecar_path.exists():

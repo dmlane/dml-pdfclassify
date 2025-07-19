@@ -1,5 +1,5 @@
 {
-  description = "dml-pdfclassify with stable Python";
+  description = "PDF classifier based on content etc";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-25.05";

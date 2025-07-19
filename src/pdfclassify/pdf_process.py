@@ -108,6 +108,9 @@ class PdfProcess:
             pdf_manager.write_custom_field(
                 field_name="/Classification", value=label.label, overwrite=True
             )
+            pdf_manager.write_custom_field(
+                field_name="/Confidence", value=label.confidence, overwrite=True
+            )
         new_path = self.take_action(
             prediction=label,
             rename=not args.no_rename,
@@ -125,7 +128,7 @@ class PdfProcess:
         """Rename/move file based on classification success or rejects."""
         if not rename:
             return None
-
+        pdf_manager = PDFMetadataManager(self.pdf_file)
         suffix = ".pdf"
         if prediction.success:
             base = output_path or self.pdf_file.parent
@@ -140,6 +143,5 @@ class PdfProcess:
         while dest.exists():
             dest = base / f"{stem}_{counter}{suffix}"
             counter += 1
-
-        shutil.move(str(self.pdf_file), dest)
+        pdf_manager.rename_with_sidecar(dest)
         return dest
