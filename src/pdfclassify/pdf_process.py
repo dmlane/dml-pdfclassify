@@ -10,6 +10,7 @@ from pypdf.errors import PdfReadError
 
 from pdfclassify._util import CONFIG, MyException
 from pdfclassify.argument_handler import ParsedArgs
+from pdfclassify.label_boost_manager import LabelBoostManager
 from pdfclassify.pdf_metadata_manager import PDFMetadataManager
 from pdfclassify.pdf_semantic_classifier import Classification, PDFSemanticClassifier
 
@@ -132,7 +133,10 @@ class PdfProcess:
         suffix = ".pdf"
         if prediction.success:
             base = output_path or self.pdf_file.parent
-            stem = prediction.label
+            label = prediction.label
+            boost_manager = LabelBoostManager()
+            config = boost_manager.get(label)
+            stem = config.get("final_name_pattern") or label
         else:
             base = self.pdf_file.parent / "pdfclassify.rejects"
             stem = self.pdf_file.stem

@@ -1,4 +1,5 @@
-"""PDFSemanticClassifier - Uses multilingual embeddings and optional label boosts for classification."""
+"""PDFSemanticClassifier - Uses multilingual embeddings and
+optional label boosts for classification."""
 
 import hashlib
 import json
@@ -22,6 +23,7 @@ from pdfclassify.label_boost_manager import LabelBoostManager
 logging.getLogger("pdfminer").setLevel(logging.ERROR)
 
 
+# pylint: disable=too-few-public-methods
 class Classification:
     """Classification result including confidence, label, and optional metadata."""
 
@@ -33,6 +35,7 @@ class Classification:
         self.devonthink_group = None
 
 
+# pylint: disable=too-many-instance-attributes
 class PDFSemanticClassifier:
     """Multilingual embedding-based PDF classifier with optional label boosts."""
 
@@ -66,7 +69,7 @@ class PDFSemanticClassifier:
 
         logger = logging.getLogger(CONFIG.app)
         if not logger.handlers:
-            handler = logging.handlers.TimedRotatingFileHandler(
+            handler = TimedRotatingFileHandler(
                 log_path, when="W0", interval=1, backupCount=5, encoding="utf-8"
             )
             formatter = logging.Formatter("[%(asctime)s] %(message)s", "%Y-%m-%d %H:%M:%S")
@@ -90,7 +93,7 @@ class PDFSemanticClassifier:
         file_hash = hashlib.md5(file_path.encode()).hexdigest()
         return self.embeddings_dir / f"{file_hash}.joblib"
 
-    def train(self) -> None:
+    def train(self) -> None:  # pylint: disable=too-many-locals, too-many-branches
         """Train or update the model from persistent embeddings."""
         for label_dir in self.data_dir.iterdir():
             if label_dir.is_dir() and not any(label_dir.glob("*.pdf")):
@@ -159,7 +162,9 @@ class PDFSemanticClassifier:
         """Load model vectors and labels from disk."""
         self.doc_vectors, self.labels = joblib.load(self.model_path)
 
-    def predict(self, pdf_path: str, confidence_threshold: float = 0.75) -> Classification:
+    def predict(
+        self, pdf_path: str, confidence_threshold: float = 0.75
+    ) -> Classification:  # pylint: disable=too-many-locals
         """Predict the label for a PDF based on cosine similarity and optional boost."""
         try:
             text = extract_text(pdf_path)
