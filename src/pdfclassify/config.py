@@ -70,6 +70,15 @@ class PDFClassifyConfig:
         self.confidence_threshold: float = float(
             config.get("settings", {}).get("confidence_threshold", 0.75)
         )
+        self.label_config_path = resolve_and_expand_path(
+            str(
+                config.get("paths", {}).get(
+                    "label_config_path", "~/.config/pdfclassify/label_config.json"
+                )
+            )
+        )
+        self.org = "dmlane.net"
+        self.app = "pdfclassify"
 
     def _load_config(self) -> Tuple[Dict[str, Any], Optional[Path]]:
         """
