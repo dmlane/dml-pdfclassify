@@ -133,13 +133,14 @@ class LabelBoostCLI:
                 print("✅ Stale entries removed.")
 
     def _maybe_refresh_devonthink_groups(self) -> None:
-        """Prompt the user to refresh DEVONthink groups once per session."""
-        if not self._get_devonthink_groups():
-            refresh = questionary.confirm(
-                "Refresh DEVONthink group list?", style=CUSTOM_STYLE
-            ).ask()
-            if refresh:
-                self._get_devonthink_groups(force_refresh=True)
+        """Prompt the user to optionally refresh DEVONthink groups once per session."""
+        refresh = questionary.confirm(
+            "Refresh DEVONthink group list?", default=False, style=CUSTOM_STYLE
+        ).ask()
+        if refresh:
+            self._get_devonthink_groups(force_refresh=True)
+        else:
+            self._get_devonthink_groups(force_refresh=False)
 
     def _is_complete(self, label: str) -> bool:
         """Return whether a label's configuration is complete."""
