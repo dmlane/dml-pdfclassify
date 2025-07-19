@@ -1,18 +1,17 @@
 {
-  description = "dml-pdfclassify with mach-nix and stable Python";
+  description = "dml-pdfclassify with stable Python";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-25.05";
-    mach-nix.url = "github:DavHau/mach-nix";
-    # Optionally pin mach-nix here, e.g.:
-    # mach-nix.rev = "v0.7.0";
+    pyproject-nix.url = "github:pyproject-nix/pyproject.nix";
+    pyproject-nix.inputs.nixpkgs.follows = "nixpkgs";
   };
 
   outputs =
     {
       self,
       nixpkgs,
-      mach-nix,
+      pyproject-nix,
       ...
     }:
     let
@@ -22,7 +21,7 @@
       ];
       forAllSystems = nixpkgs.lib.genAttrs systems;
 
-      pythonVersion = "3.13"; # 👈 change this to test other versions
+      pythonVersion = "3.12"; # 👈 change this to test other versions
       selectPython =
         pkgs:
         {
@@ -30,7 +29,7 @@
           "3.12" = pkgs.python312;
           "3.13" = pkgs.python313;
         }
-        ."${pythonVersion}";
+        .${pythonVersion};
     in
     {
       packages = forAllSystems (
@@ -38,15 +37,11 @@
         let
           pkgs = import nixpkgs { inherit system; };
           python = selectPython pkgs;
-          machLib = import mach-nix { inherit pkgs; };
-          pythonEnv = machLib.buildPythonPackage {
-            python = pythonVersion;
-            # Use poetry.lock or requirements.txt as needed
-            poetryLock = ./poetry.lock;
-          };
+          project = pyproject-nix.lib.project.loadPyproject { projectRoot = ./.; };
+          attrs = project.renderers.buildPythonPackage { inherit python; };
         in
         {
-          default = pythonEnv;
+          default = python.pkgs.buildPythonPackage attrs;
         }
       );
 
@@ -55,11 +50,8 @@
         let
           pkgs = import nixpkgs { inherit system; };
           python = selectPython pkgs;
-          machLib = import mach-nix { inherit pkgs; };
-          pythonEnv = machLib.buildPythonPackage {
-            python = pythonVersion;
-            poetryLock = ./poetry.lock;
-          };
+          project = pyproject-nix.lib.project.loadPyproject { projectRoot = ./.; };
+          pythonEnv = python.withPackages (project.renderers.withPackages { inherit python; });
         in
         {
           default = pkgs.mkShell {

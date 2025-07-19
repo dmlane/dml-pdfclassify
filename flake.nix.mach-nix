@@ -1,17 +1,18 @@
 {
-  description = "dml-pdfclassify with stable Python";
+  description = "dml-pdfclassify with mach-nix and stable Python";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-25.05";
-    pyproject-nix.url = "github:pyproject-nix/pyproject.nix";
-    pyproject-nix.inputs.nixpkgs.follows = "nixpkgs";
+    mach-nix.url = "github:DavHau/mach-nix";
+    # Optionally pin mach-nix here, e.g.:
+    # mach-nix.rev = "v0.7.0";
   };
 
   outputs =
     {
       self,
       nixpkgs,
-      pyproject-nix,
+      mach-nix,
       ...
     }:
     let
@@ -29,7 +30,7 @@
           "3.12" = pkgs.python312;
           "3.13" = pkgs.python313;
         }
-        .${pythonVersion};
+        ."${pythonVersion}";
     in
     {
       packages = forAllSystems (
@@ -37,11 +38,15 @@
         let
           pkgs = import nixpkgs { inherit system; };
           python = selectPython pkgs;
-          project = pyproject-nix.lib.project.loadPyproject { projectRoot = ./.; };
-          attrs = project.renderers.buildPythonPackage { inherit python; };
+          machLib = import mach-nix { inherit pkgs; };
+          pythonEnv = machLib.buildPythonPackage {
+            python = pythonVersion;
+            # Use poetry.lock or requirements.txt as needed
+            poetryLock = ./poetry.lock;
+          };
         in
         {
-          default = python.pkgs.buildPythonPackage attrs;
+          default = pythonEnv;
         }
       );
 
@@ -50,8 +55,11 @@
         let
           pkgs = import nixpkgs { inherit system; };
           python = selectPython pkgs;
-          project = pyproject-nix.lib.project.loadPyproject { projectRoot = ./.; };
-          pythonEnv = python.withPackages (project.renderers.withPackages { inherit python; });
+          machLib = import mach-nix { inherit pkgs; };
+          pythonEnv = machLib.buildPythonPackage {
+            python = pythonVersion;
+            poetryLock = ./poetry.lock;
+          };
         in
         {
           default = pkgs.mkShell {
