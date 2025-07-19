@@ -1,4 +1,4 @@
-"""Interactive CLI for managing label_boosts.json configuration."""
+""" ""Interactive CLI for managing label_boosts.json configuration."""
 
 import ast
 import json
@@ -72,9 +72,13 @@ class LabelBoostCLI:
             raw_output = result.stdout.strip()
             try:
                 parsed = ast.literal_eval(raw_output)
-                # groups = [g.strip().strip('"') for g in parsed if isinstance(g, str)]
-                groups = [g.strip('"') for g in parsed if isinstance(g, str)]
-
+                groups = []
+                for g in parsed:
+                    if isinstance(g, str):
+                        unquoted = g.strip()
+                        if unquoted.startswith('"') and unquoted.endswith('"'):
+                            unquoted = unquoted[1:-1]
+                        groups.append(unquoted)
             except ValueError:
                 print("⚠️ Failed to parse AppleScript result. Raw output:")
                 print(raw_output)
@@ -135,13 +139,14 @@ class LabelBoostCLI:
                 print("✅ Stale entries removed.")
 
     def _maybe_refresh_devonthink_groups(self) -> None:
-        """Prompt the user to refresh DEVONthink groups once per session."""
-        if not self._get_devonthink_groups():
-            refresh = questionary.confirm(
-                "Refresh DEVONthink group list?", style=CUSTOM_STYLE
-            ).ask()
-            if refresh:
-                self._get_devonthink_groups(force_refresh=True)
+        """Ask once per session if the user wants to refresh the DEVONthink group list."""
+        refresh = questionary.confirm(
+            "Refresh DEVONthink group list from DEVONthink now?", default=False, style=CUSTOM_STYLE
+        ).ask()
+        if refresh:
+            self._get_devonthink_groups(force_refresh=True)
+        else:
+            self._get_devonthink_groups(force_refresh=False)
 
     def _is_complete(self, label: str) -> bool:
         """Return whether a label's configuration is complete."""
