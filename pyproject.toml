@@ -15,6 +15,7 @@ dependencies = [
   "platformdirs>=4.3.7",
   "pypdf (==5.4.0)",
   "questionary (>=2.1.0,<3.0.0)",
+  "dateparser==1.2.1",
 ]
 
 [project.urls]
@@ -24,6 +25,8 @@ Repository = "https://github.com/dmlane/dml-pdfclassify"
 [tool.poetry.scripts]
 pdfclassify = "pdfclassify.main:main"
 pdfconfig = "pdfclassify.label_boost_cli:main"
+pdfdate = "pdfclassify.pdf_date:main"
+
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
