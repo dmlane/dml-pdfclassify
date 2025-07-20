@@ -230,6 +230,7 @@ def main() -> None:
     """Main entry point for the label boost manager script."""
     if not _devonthink_installed():
         print("❌ DEVONthink is not installed or not scriptable.")
+        sys.exit(1)
     try:
         LabelBoostCLI().run()
     except KeyboardInterrupt:
