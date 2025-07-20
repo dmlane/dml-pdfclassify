@@ -42,7 +42,7 @@ def get_preferred_contexts(pdf_file: Path) -> list[str]:
     try:
         with meta_path.open("r", encoding="utf-8") as meta_file:
             meta = json.load(meta_file)
-        return meta.get("/Preferred_Context", [])
+        return meta.get("/preferred_context", [])
     except (json.JSONDecodeError, TypeError):
         return []
 
@@ -71,19 +71,24 @@ def find_all_dates(text: str, languages: list[str]) -> list[tuple[datetime, str]
 def date_from_context(
     text: str, contexts: list[str], languages: list[str]
 ) -> Optional[tuple[datetime, str]]:
-    """Try to locate a date from context keyword matches in the same line."""
-    settings = {  # type: ignore[var-annotated]
-        "PREFER_DAY_OF_MONTH": "first",
-    }
-
+    """Try to locate a date where the context keyword appears before the date in the same line."""
+    settings = {"PREFER_DAY_OF_MONTH": "first"}
     lowered_contexts = [c.lower() for c in contexts]
+
     for line in text.splitlines():
-        if any(ctx in line.lower() for ctx in lowered_contexts):
+        line_lower = line.lower()
+        for ctx in lowered_contexts:
+            ctx_index = line_lower.find(ctx)
+            if ctx_index == -1:
+                continue
+
             for pattern in DATE_REGEXES:
-                for match in re.findall(pattern, line, flags=re.IGNORECASE):
-                    parsed = parse(match, languages=languages, settings=settings)  # type: ignore[arg-type]
-                    if parsed and parsed.year >= 2020:
-                        return parsed, match.strip()
+                for match in re.finditer(pattern, line, flags=re.IGNORECASE):
+                    if match.start() > ctx_index:
+                        parsed = parse(match.group(), languages=languages, settings=settings)
+                        if parsed and parsed.year >= 2020:
+                            return parsed, match.group().strip()
+
     return None
 
 
