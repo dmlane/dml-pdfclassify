@@ -12,41 +12,49 @@ Usage:
 """
 
 import argparse
+import json
 import re
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import Optional
 
 from dateparser import parse
-from pypdf import PdfReader
 
-from pdfclassify.argument_handler import get_version  # lazy import of version
+from pdfclassify._util import extract_text_from_pdf
+from pdfclassify.argument_handler import get_version
 
-# noinspection SpellCheckingInspection
+# Short + long formats including day-month-year and short-year
 DATE_REGEXES = [
-    r"\b\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\b",
-    r"\b\d{4}[/-]\d{1,2}[/-]\d{1,2}\b",
-    r"\b\d{1,2}\s+[a-zA-Zéêäöüßçñ]+\s+\d{4}\b",
-    r"\b\d{1,2}\.\s*[a-zA-Zéêäöüßçñ]+\s+\d{4}\b",
-    r"\b\d{1,2}\s+de\s+[a-zA-Zéêäöüßçñ]+\s+de\s+\d{4}\b",
-    r"\b\d{1,2}\s+[a-zA-Zéêäöüßçñ]{3,}\.?\s+\d{4}\b",
+    r"\b\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\b",  # e.g. 17/05/2025 or 17-05-25
+    r"\b\d{4}[/-]\d{1,2}[/-]\d{1,2}\b",  # e.g. 2025-05-17
+    r"\b\d{1,2}\s+[a-zA-Zéêäöüßçñ]+\s+\d{2,4}\b",  # e.g. 17 May 25
+    r"\b\d{1,2}\.\s*[a-zA-Zéêäöüßçñ]+\s+\d{4}\b",  # e.g. 17. Mai 2025
+    r"\b\d{1,2}\s+de\s+[a-zA-Zéêäöüßçñ]+\s+de\s+\d{4}\b",  # e.g. 17 de mayo de 2025
+    r"\b\d{1,2}\s+[a-zA-Zéêäöüßçñ]{3,}\.?\s+\d{4}\b",  # e.g. 17 mai. 2025
 ]
 
 
-def extract_text_from_pdf(path: Path) -> str:
-    """Extract all text from a PDF file."""
-    reader = PdfReader(str(path))
-    return "\n".join(page.extract_text() or "" for page in reader.pages)
+def get_preferred_contexts(pdf_file: Path) -> list[str]:
+    """Read .meta.json and return Preferred_Context list, or empty list."""
+    meta_path = pdf_file.with_suffix(pdf_file.suffix + ".meta.json")
+    if not meta_path.exists():
+        return []
+    try:
+        with meta_path.open("r", encoding="utf-8") as meta_file:
+            meta = json.load(meta_file)
+        return meta.get("/Preferred_Context", [])
+    except (json.JSONDecodeError, TypeError):
+        return []
 
 
 def find_all_dates(text: str, languages: list[str]) -> list[tuple[datetime, str]]:
-    """
-    Find and parse all explicit dates in the given text, in document order.
-    Returns a list of (datetime, matched_string).
-    """
+    """Return a list of (datetime, matched string) tuples for all detected dates."""
     found = set()
     results: list[tuple[datetime, str]] = []
-    settings: dict[str, Any] = {"PREFER_DAY_OF_MONTH": "first"}
+
+    settings = {  # type: ignore[var-annotated]
+        "PREFER_DAY_OF_MONTH": "first",
+    }
 
     for pattern in DATE_REGEXES:
         for match in re.findall(pattern, text, flags=re.IGNORECASE):
@@ -60,7 +68,26 @@ def find_all_dates(text: str, languages: list[str]) -> list[tuple[datetime, str]
     return results
 
 
-def format_with_template(date_obj: datetime, template: str | None) -> str:
+def date_from_context(
+    text: str, contexts: list[str], languages: list[str]
+) -> Optional[tuple[datetime, str]]:
+    """Try to locate a date from context keyword matches in the same line."""
+    settings = {  # type: ignore[var-annotated]
+        "PREFER_DAY_OF_MONTH": "first",
+    }
+
+    lowered_contexts = [c.lower() for c in contexts]
+    for line in text.splitlines():
+        if any(ctx in line.lower() for ctx in lowered_contexts):
+            for pattern in DATE_REGEXES:
+                for match in re.findall(pattern, line, flags=re.IGNORECASE):
+                    parsed = parse(match, languages=languages, settings=settings)  # type: ignore[arg-type]
+                    if parsed and parsed.year >= 2020:
+                        return parsed, match.strip()
+    return None
+
+
+def format_with_template(date_obj: datetime, template: Optional[str]) -> str:
     """Replace YYYY, MM, DD placeholders in the template or return YYYYMMDD."""
     if template:
         return (
@@ -117,6 +144,23 @@ def main() -> None:
     args = parser.parse_args()
     languages = ["en", "fr", "de", "es"]
     text = extract_text_from_pdf(args.pdf_file)
+
+    # Attempt context-aware extraction if available
+    preferred_contexts = get_preferred_contexts(args.pdf_file)
+    if preferred_contexts:
+        result = date_from_context(text, preferred_contexts, languages)
+        if result:
+            date_obj, _ = result
+            if args.convert:
+                template = args.pdf_file.name
+            elif args.template:
+                template = args.template
+            else:
+                template = None
+            print(format_with_template(date_obj, template))
+            return
+
+    # Fallback: generic extraction
     dates = find_all_dates(text, languages)
 
     if args.list:

@@ -20,6 +20,7 @@ class MyMetadata:
     original_date: Optional[str] = None
     confidence: Optional[float] = None
     sha256: Optional[str] = None
+    preferred_context: Optional[list[str]] = None
 
 
 class PDFMetadataManager:

@@ -27,7 +27,13 @@ CUSTOM_STYLE = Style.from_dict(
 )
 
 CACHE_PATH = CONFIG.cache_dir / "devonthink_groups.json"
-REQUIRED_FIELDS = ["boost_phrases", "boost", "final_name_pattern", "devonthink_group"]
+REQUIRED_FIELDS = [
+    "boost_phrases",
+    "boost",
+    "final_name_pattern",
+    "devonthink_group",
+    "preferred_context",
+]
 
 
 def _devonthink_installed() -> bool:
@@ -49,6 +55,9 @@ def _devonthink_installed() -> bool:
         return False
 
 
+# pylint: disable=too-few-public-methods
+
+
 class LabelBoostCLI:
     """Interactive CLI for editing the label_boosts.json config."""
 
@@ -68,7 +77,7 @@ class LabelBoostCLI:
                         LabelBoostCLI._devonthink_groups_cache = cached
                         return cached
             except (OSError, json.JSONDecodeError):
-                print("⚠️ Failed to load group cache. Will re-query DEVONthink.")
+                print("\u26a0\ufe0f Failed to load group cache. Will re-query DEVONthink.")
 
         script = """
         tell application id "DNtp"
@@ -93,7 +102,7 @@ class LabelBoostCLI:
                 parsed = ast.literal_eval(raw_output)
                 groups = [g.strip('"') for g in parsed if isinstance(g, str)]
             except ValueError:
-                print("⚠️ Failed to parse AppleScript result. Raw output:")
+                print("\u26a0\ufe0f Failed to parse AppleScript result. Raw output:")
                 print(raw_output)
                 groups = []
 
@@ -103,15 +112,19 @@ class LabelBoostCLI:
                 json.dump(groups, f, indent=2, ensure_ascii=False)
             return groups
         except subprocess.CalledProcessError as err:
-            print("⚠️ Could not retrieve groups from DEVONthink:", err)
+            print("\u26a0\ufe0f Could not retrieve groups from DEVONthink:", err)
             return []
 
     def __init__(self) -> None:
         self.boosts = LabelBoostManager()
         self.config = self.boosts.config
 
+        # Ensure preferred_context exists on all entries
+        for _, entry in self.config.items():
+            entry.setdefault("preferred_context", [])
+
         if self.boosts.missing_labels():
-            print("🔄 New training labels detected.")
+            print("\ud83d\udd04 New training labels detected.")
             self.boosts.sync_with_training_labels(interactive=True)
             self.config = self.boosts.config
             self.boosts.save()
@@ -131,7 +144,7 @@ class LabelBoostCLI:
 
     def _edit_label(self, label: str) -> None:
         if label not in self.config:
-            print(f"⚠️  Unknown label selected: {label}")
+            print(f"\u26a0\ufe0f  Unknown label selected: {label}")
             return
 
         entry = self.config[label]
@@ -170,7 +183,7 @@ class LabelBoostCLI:
             ).ask()
             entry["devonthink_group"] = devon_group or None
         else:
-            print("⚠️ DEVONthink group list unavailable. Please enter manually.")
+            print("\u26a0\ufe0f DEVONthink group list unavailable. Please enter manually.")
             devon_group = questionary.text(
                 "Devonthink group",
                 default=entry.get("devonthink_group") or "",
@@ -178,9 +191,16 @@ class LabelBoostCLI:
             ).ask()
             entry["devonthink_group"] = devon_group or None
 
+        preferred = questionary.text(
+            "Preferred contexts (comma-separated)",
+            default=", ".join(entry.get("preferred_context", [])),
+            style=CUSTOM_STYLE,
+        ).ask()
+        entry["preferred_context"] = [p.strip() for p in preferred.split(",") if p.strip()]
+
         self.config[label] = entry
         self._save_config()
-        print("✅ Saved.")
+        print("\u2705 Saved.")
 
     def run(self) -> None:
         """Run the label boost CLI."""
@@ -205,13 +225,13 @@ class LabelBoostCLI:
             )
 
             if not filtered_labels:
-                print("✅ All labels are complete.")
+                print("\u2705 All labels are complete.")
                 continue
 
             while True:
                 choices = [
                     questionary.Choice(
-                        title=f"{'✅' if self.boosts.is_complete(label) else '❌'} {label}",
+                        title=f"{'\u2705' if self.boosts.is_complete(label) else '\u274c'} {label}",
                         value=label,
                     )
                     for label in filtered_labels
@@ -229,12 +249,12 @@ class LabelBoostCLI:
 def main() -> None:
     """Main entry point for the label boost manager script."""
     if not _devonthink_installed():
-        print("❌ DEVONthink is not installed or not scriptable.")
+        print("\u274c DEVONthink is not installed or not scriptable.")
         sys.exit(1)
     try:
         LabelBoostCLI().run()
     except KeyboardInterrupt:
-        print("\n👋 Exiting.")
+        print("\n\ud83d\udc4b Exiting.")
         sys.exit(0)
 
 

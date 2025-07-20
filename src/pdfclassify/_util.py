@@ -2,6 +2,9 @@
 
 import argparse
 import textwrap
+from pathlib import Path
+
+from pypdf import PdfReader
 
 from pdfclassify.config import PDFClassifyConfig
 
@@ -28,3 +31,9 @@ class RawFormatter(argparse.HelpFormatter):
                 for line in textwrap.indent(textwrap.dedent(text), indent).splitlines()
             ]
         )
+
+
+def extract_text_from_pdf(pdf_file: Path) -> str:
+    """Extract all text from a PDF using pypdf."""
+    reader = PdfReader(str(pdf_file))
+    return "\n".join(page.extract_text() or "" for page in reader.pages)
