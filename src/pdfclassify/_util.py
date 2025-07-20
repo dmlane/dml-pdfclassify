@@ -1,13 +1,15 @@
 """Utility classes and functions"""
 
 import argparse
+import logging
 import textwrap
 from pathlib import Path
 
-from pypdf import PdfReader
+from pdfminer.high_level import extract_text
 
 from pdfclassify.config import PDFClassifyConfig
 
+logging.getLogger("pdfminer").setLevel(logging.ERROR)
 # Load config once only and make it available throughout the application
 CONFIG = PDFClassifyConfig()
 
@@ -33,7 +35,13 @@ class RawFormatter(argparse.HelpFormatter):
         )
 
 
-def extract_text_from_pdf(pdf_file: Path) -> str:
-    """Extract all text from a PDF using pypdf."""
-    reader = PdfReader(str(pdf_file))
-    return "\n".join(page.extract_text() or "" for page in reader.pages)
+# in _util.py
+
+
+def extract_text_from_pdf(pdf_path: Path) -> str:
+    """Extract text using pdfminer.six (better layout/text coverage)."""
+    try:
+        return extract_text(str(pdf_path)) or ""
+    except Exception as e:
+        print(f"⚠️ PDF text extraction failed: {e}")
+        return ""
