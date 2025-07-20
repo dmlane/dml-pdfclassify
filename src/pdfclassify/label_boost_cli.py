@@ -30,6 +30,25 @@ CACHE_PATH = CONFIG.cache_dir / "devonthink_groups.json"
 REQUIRED_FIELDS = ["boost_phrases", "boost", "final_name_pattern", "devonthink_group"]
 
 
+def _devonthink_installed() -> bool:
+    if sys.platform != "darwin":
+        return False  # Not macOS, so DEVONthink won't be present
+    try:
+        result = subprocess.run(
+            [
+                "mdfind",
+                "kMDItemCFBundleIdentifier == 'com.devon-technologies.think3' || "
+                "kMDItemCFBundleIdentifier == 'com.devon-technologies.think4'",
+            ],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        return bool(result.stdout.strip())
+    except (subprocess.SubprocessError, FileNotFoundError):
+        return False
+
+
 class LabelBoostCLI:
     """Interactive CLI for editing the label_boosts.json config."""
 
@@ -164,6 +183,7 @@ class LabelBoostCLI:
         print("✅ Saved.")
 
     def run(self) -> None:
+        """Run the label boost CLI."""
         while True:
             filter_mode = questionary.select(
                 "What do you want to show?",
@@ -207,6 +227,9 @@ class LabelBoostCLI:
 
 
 def main() -> None:
+    """Main entry point for the label boost manager script."""
+    if not _devonthink_installed():
+        print("❌ DEVONthink is not installed or not scriptable.")
     try:
         LabelBoostCLI().run()
     except KeyboardInterrupt:
