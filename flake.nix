@@ -39,9 +39,11 @@
           python = selectPython pkgs;
           project = pyproject-nix.lib.project.loadPyproject { projectRoot = ./.; };
           attrs = project.renderers.buildPythonPackage { inherit python; };
+          pkg = python.pkgs.buildPythonPackage attrs;
         in
         {
-          default = python.pkgs.buildPythonPackage attrs;
+          default = pkg;
+          dml-pdfclassify = pkg;
         }
       );
 
