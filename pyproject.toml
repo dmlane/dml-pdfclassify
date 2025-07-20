@@ -21,7 +21,7 @@ dependencies = [
 Homepage = "https://github.com/dmlane/dml-pdfclassify"
 Repository = "https://github.com/dmlane/dml-pdfclassify"
 
-[project.scripts]
+[tool.poetry.scripts]
 pdfclassify = "pdfclassify.main:main"
 pdfconfig = "pdfclassify.label_boost_cli:main"
 [build-system]
