@@ -25,7 +25,7 @@ from pdfclassify.argument_handler import get_version
 
 # Short + long formats including day-month-year and short-year
 DATE_REGEXES = [
-    r"\b(0?[1-9]|1[0-2])[/-](20\d{2})\b",  # MM/YYYY
+    r"\b(?:0?[1-9]|1[0-2])[/-](20\d{2})\b",  # MM/YYYY
     r"\b\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\b",  # e.g. 17/05/2025 or 17-05-25
     r"\b\d{4}[/-]\d{1,2}[/-]\d{1,2}\b",  # e.g. 2025-05-17
     r"\b\d{1,2}\s+[a-zA-Zéêäöüßçñ]+\s+\d{2,4}\b",  # e.g. 17 May 25
