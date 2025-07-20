@@ -55,7 +55,7 @@ class PDFMetadataManager:
 
     def _save_metadata(self, metadata: dict) -> None:
         """Save metadata to the sidecar file."""
-        metadata["/Sha256"] = self._calculate_pdf_hash()
+        metadata["/sha256"] = self._calculate_pdf_hash()
         with self.sidecar_path.open("w", encoding="utf-8") as f:
             json.dump(metadata, f, indent=2, ensure_ascii=False)
 
@@ -81,12 +81,7 @@ class PDFMetadataManager:
     def get_structured_metadata(self) -> MyMetadata:
         """Load sidecar metadata into a structured dataclass."""
         data = self._load_metadata()
-        return MyMetadata(
-            **{
-                f.name: data.get("/" + f.name.replace("_", " ").title().replace(" ", "_"))
-                for f in fields(MyMetadata)
-            }
-        )
+        return MyMetadata(**{f.name: data.get("/" + f.name.lower()) for f in fields(MyMetadata)})
 
     def read_custom_field(self, field_name: str) -> Optional[Union[str, float, int]]:
         """
@@ -103,15 +98,15 @@ class PDFMetadataManager:
     def write_custom_field(
         self,
         field_name: str,
-        value: str | float,
+        value: str | float | int | list[str],
         overwrite: bool = True,
     ) -> bool:
         """
         Write or update a custom metadata field in the sidecar.
 
         Args:
-            field_name (str): The name of the field (e.g., "/Classification")
-            value (str): The value to set
+            field_name (str): The name of the field (e.g., "/classification")
+            value (str | float | int | list[str]): The value to set
             overwrite (bool): If False, will skip writing if field exists
 
         Returns:
@@ -120,13 +115,17 @@ class PDFMetadataManager:
         metadata = self._load_metadata()
         if not overwrite and field_name in metadata:
             return False
-            # Coerce value to native JSON-safe types
+
+        # Coerce value to JSON-safe types
         if isinstance(value, (np.floating, float)):
             value = float(value)
         elif isinstance(value, (np.integer, int)):
             value = int(value)
+        elif isinstance(value, list):
+            value = [str(v) for v in value]
         else:
             value = str(value)
+
         metadata[field_name] = value
         self._save_metadata(metadata)
         return True
@@ -175,7 +174,7 @@ class PDFMetadataManager:
 
     def verify_pdf_hash(self) -> bool:
         """Verify that the current PDF matches the SHA-256 hash in the sidecar."""
-        stored = self.read_custom_field("/Sha256")
+        stored = self.read_custom_field("/sha256")
         if not stored:
             return False
         return stored == self._calculate_pdf_hash()

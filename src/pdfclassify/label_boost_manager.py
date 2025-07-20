@@ -60,6 +60,14 @@ class LabelBoostManager:
                 if isinstance(val, str) or val is None:
                     validated[key] = val
 
+            if isinstance(value.get("preferred_context"), list):
+                if all(isinstance(p, str) for p in value["preferred_context"]):
+                    validated["preferred_context"] = value["preferred_context"]
+                else:
+                    self.logger.warning(
+                        "Invalid preferred_context for label %r: expected list of strings", label
+                    )
+
             if validated:
                 valid_config[label] = validated
 

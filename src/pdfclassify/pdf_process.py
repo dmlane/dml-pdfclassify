@@ -53,10 +53,10 @@ class PdfProcess:
         try:
             pdf_manager = PDFMetadataManager(self.pdf_file)
             mod_date = datetime.fromtimestamp(self.pdf_file.stat().st_mtime).isoformat()
-            if pdf_manager.read_custom_field("/Original_Filename") is None:
-                pdf_manager.write_custom_field("/Original_Filename", self.pdf_file.name)
-            if pdf_manager.read_custom_field("/Original_Date") is None:
-                pdf_manager.write_custom_field("/Original_Date", mod_date)
+            if pdf_manager.read_custom_field("/original_filename") is None:
+                pdf_manager.write_custom_field("/original_filename", self.pdf_file.name)
+            if pdf_manager.read_custom_field("/original_date") is None:
+                pdf_manager.write_custom_field("/original_date", mod_date)
         except PdfReadError as e:
             raise MyException(f"Invalid PDF file: {e}", 2) from e
         except Exception as e:
@@ -66,8 +66,8 @@ class PdfProcess:
         """Restore filename and timestamp from sidecar metadata fields."""
         pdf_manager = PDFMetadataManager(self.pdf_file)
 
-        orig_name = pdf_manager.read_custom_field("/Original_Filename")
-        orig_date = pdf_manager.read_custom_field("/Original_Date")
+        orig_name = pdf_manager.read_custom_field("/original_filename")
+        orig_date = pdf_manager.read_custom_field("/original_date")
 
         # Rename file (and sidecar) if original name is present
         if orig_name and orig_name != self.pdf_file.name:
@@ -107,11 +107,21 @@ class PdfProcess:
         print(f"Predicted label: {label.label} with confidence {label.confidence:.2f}")
         if label.success:
             pdf_manager.write_custom_field(
-                field_name="/Classification", value=label.label, overwrite=True
+                field_name="/classification", value=label.label, overwrite=True
             )
             pdf_manager.write_custom_field(
-                field_name="/Confidence", value=label.confidence, overwrite=True
+                field_name="/confidence", value=label.confidence, overwrite=True
             )
+
+            # NEW: write /preferred_context from config if available
+            boost_manager = LabelBoostManager()
+            config = boost_manager.get(label.label)
+            preferred_context = config.get("preferred_context")
+            if preferred_context:
+                pdf_manager.write_custom_field(
+                    field_name="/preferred_context", value=preferred_context, overwrite=True
+                )
+
         new_path = self.take_action(
             prediction=label,
             rename=not args.no_rename,
