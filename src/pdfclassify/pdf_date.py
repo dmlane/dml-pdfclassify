@@ -55,6 +55,7 @@ def find_all_dates(text: str, languages: list[str]) -> list[tuple[datetime, str]
 
     settings = {  # type: ignore[var-annotated]
         "PREFER_DAY_OF_MONTH": "first",
+        "DATE_ORDER": "DMY",
     }
 
     for pattern in DATE_REGEXES:
@@ -73,7 +74,10 @@ def date_from_context(
     text: str, contexts: list[str], languages: list[str]
 ) -> Optional[tuple[datetime, str]]:
     """Try to locate a date where the context keyword appears before the date in the same line."""
-    settings = {"PREFER_DAY_OF_MONTH": "first"}
+    settings = {
+        "PREFER_DAY_OF_MONTH": "first",
+        "DATE_ORDER": "DMY",
+    }
     lowered_contexts = [c.lower() for c in contexts]
 
     for line in text.splitlines():

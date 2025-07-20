@@ -159,7 +159,7 @@ class LabelBoostCLI:
 
         boost_default = "0.0" if entry.get("boost") == -1.0 else str(entry.get("boost", "0.0"))
         boost = questionary.text(
-            "Boost (0.0 to 1.0)",
+            "Boost (0.05 to 0.07)",
             default=boost_default,
             validate=lambda x: x.replace(".", "", 1).isdigit() or "Must be a float",
             style=CUSTOM_STYLE,
