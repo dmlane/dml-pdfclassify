@@ -7,7 +7,7 @@ on:
 
 jobs:
   cleanup:
-    uses: your-username/github-actions/.github/workflows/cleanup-releases.yml@main
+    uses: dmlane/github-actions/.github/workflows/cleanup-releases.yml@main
     with:
       days-to-keep: '90'
       min-releases-to-keep: '5'
