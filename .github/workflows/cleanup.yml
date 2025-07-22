@@ -9,7 +9,7 @@ jobs:
   cleanup:
     uses: dmlane/gitHub-workflows/.github/workflows/cleanup-releases.yml@main
     with:
-      days-to-keep: '1'
+      days-to-keep: '0'
       min-releases-to-keep: '5'
     secrets:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
