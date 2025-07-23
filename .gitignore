@@ -136,3 +136,4 @@ dmypy.json
 .make_files/
 /result
 /.direnv
+tests/testresources/private_pdfs
