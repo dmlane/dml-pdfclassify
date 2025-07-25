@@ -30,7 +30,7 @@ def test_config_path_fixture(tmp_path: Path) -> Generator[Path, Any, None]:
 
 @patch("pdfclassify.label_boost_cli.questionary")
 @patch("pdfclassify.label_boost_cli.LabelBoostManager")
-def test_edit_label(mock_manager_class, mock_questionary, _test_config_path):
+def test_edit_label(mock_manager_class, mock_questionary, test_config_path):
     """Test editing a label's config using real LabelConfig and validated inputs."""
     real_label = LabelConfig(
         boost_phrases=["phrase1"],
