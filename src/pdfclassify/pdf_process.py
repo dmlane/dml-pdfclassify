@@ -116,7 +116,7 @@ class PdfProcess:
             # NEW: write /preferred_context from config if available
             boost_manager = LabelBoostManager()
             config = boost_manager.get(label.label)
-            preferred_context = config.get("preferred_context")
+            preferred_context = config.preferred_context
             if preferred_context:
                 pdf_manager.write_custom_field(
                     field_name="/preferred_context", value=preferred_context, overwrite=True
@@ -146,7 +146,7 @@ class PdfProcess:
             label = prediction.label
             boost_manager = LabelBoostManager()
             config = boost_manager.get(label)
-            stem = config.get("final_name_pattern") or label
+            stem = config.final_name_pattern or label
         else:
             base = self.pdf_file.parent / "pdfclassify.rejects"
             stem = self.pdf_file.stem

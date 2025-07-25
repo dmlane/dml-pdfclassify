@@ -126,7 +126,8 @@ class PDFMetadataManager:
         else:
             value = str(value)
 
-        metadata[field_name] = value
+        metadata[field_name.lower()] = value
+
         self._save_metadata(metadata)
         return True
 
@@ -148,7 +149,8 @@ class PDFMetadataManager:
         Raises an error if the sidecar's hash does not match the PDF.
 
         Args:
-            new_name (str | Path): New file name or path (e.g., 'invoice.pdf' or '/new/path/invoice.pdf')
+            new_name (str | Path): New file name or path (e.g., 'invoice.pdf' or
+            '/new/path/invoice.pdf')
 
         Returns:
             Path: The new path to the renamed PDF

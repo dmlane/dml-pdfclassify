@@ -33,6 +33,8 @@ class Classification:
         self.success = success
         self.final_name_pattern = None
         self.devonthink_group = None
+        self.boost_phrases = []
+        self.preferred_context = []
 
 
 # pylint: disable=too-many-instance-attributes
@@ -166,6 +168,7 @@ class PDFSemanticClassifier:
         self, pdf_path: str, confidence_threshold: float = 0.75
     ) -> Classification:  # pylint: disable=too-many-locals
         """Predict the label for a PDF based on cosine similarity and optional boost."""
+        # pylint: disable=too-many-locals
         try:
             text = extract_text(pdf_path)
         except (PDFSyntaxError, OSError, ValueError) as exc:
@@ -216,8 +219,13 @@ class PDFSemanticClassifier:
             label=predicted_label,
             success=success,
         )
+
+        # Attach metadata from the label config
         label_meta = self.boosts.get(predicted_label)
-        classification.final_name_pattern = label_meta.get("final_name_pattern")
-        classification.devonthink_group = label_meta.get("devonthink_group")
+        if label_meta:
+            classification.final_name_pattern = label_meta.final_name_pattern
+            classification.devonthink_group = label_meta.devonthink_group
+            classification.boost_phrases = label_meta.boost_phrases
+            classification.preferred_context = label_meta.preferred_context
 
         return classification

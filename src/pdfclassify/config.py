@@ -41,7 +41,7 @@ def expand_path(path_str: str) -> Path:
     return Path(os.path.expanduser(os.path.expandvars(path_str)))
 
 
-class PDFClassifyConfig:
+class PDFClassifyConfig:  # pylint: disable=too-many-instance-attributes
     """Load configuration from TOML file."""
 
     # pylint: disable=too-few-public-methods

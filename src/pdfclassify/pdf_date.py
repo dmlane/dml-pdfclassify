@@ -80,7 +80,7 @@ def date_from_context(
     }
     lowered_contexts = [c.lower() for c in contexts]
 
-    for line in text.splitlines():
+    for line in text.splitlines():  # pylint: disable=too-many-nested-blocks
         line_lower = line.lower()
         for ctx in lowered_contexts:
             ctx_index = line_lower.find(ctx)
@@ -90,7 +90,11 @@ def date_from_context(
             for pattern in DATE_REGEXES:
                 for match in re.finditer(pattern, line, flags=re.IGNORECASE):
                     if match.start() > ctx_index:
-                        parsed = parse(match.group(), languages=languages, settings=settings)
+                        parsed = parse(
+                            match.group(),
+                            languages=languages,
+                            settings=settings,  # type: ignore[arg-type]
+                        )
                         if parsed and parsed.year >= 2020:
                             return parsed, match.group().strip()
 
@@ -108,7 +112,7 @@ def format_with_template(date_obj: datetime, template: Optional[str]) -> str:
     return f"{date_obj.year:04d}{date_obj.month:02d}{date_obj.day:02d}"
 
 
-def main() -> None:
+def main() -> None:  # pylint: disable=too-many-branches
     """Parse arguments, extract dates, and print result or list."""
     parser = argparse.ArgumentParser(
         description="Extract the nth date from a PDF and apply formatting.",

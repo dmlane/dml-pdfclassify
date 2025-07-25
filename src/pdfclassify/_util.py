@@ -42,6 +42,6 @@ def extract_text_from_pdf(pdf_path: Path) -> str:
     """Extract text using pdfminer.six (better layout/text coverage)."""
     try:
         return extract_text(str(pdf_path)) or ""
-    except Exception as e:
+    except Exception as e:  # pylint: disable=broad-exception-caught
         print(f"⚠️ PDF text extraction failed: {e}")
         return ""

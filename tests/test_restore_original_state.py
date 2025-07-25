@@ -38,8 +38,8 @@ def test_sidecar_original_metadata(dummy_pdf: Path, tmp_path: Path) -> None:
 
     # Write original metadata
     manager = PDFMetadataManager(dummy_pdf)
-    manager.write_custom_field("/Original_Filename", original_name)
-    manager.write_custom_field("/Original_Date", iso_date)
+    manager.write_custom_field("/original_filename", original_name)
+    manager.write_custom_field("/original_date", iso_date)
 
     # Rename PDF and sidecar together
     renamed_path = tmp_path / "renamed.pdf"
@@ -50,6 +50,6 @@ def test_sidecar_original_metadata(dummy_pdf: Path, tmp_path: Path) -> None:
 
     # Reload manager from renamed path and verify metadata
     manager = PDFMetadataManager(renamed_path)
-    assert manager.read_custom_field("/Original_Filename") == "original_name.pdf"
-    assert manager.read_custom_field("/Original_Date") == iso_date
+    assert manager.read_custom_field("/original_filename") == "original_name.pdf"
+    assert manager.read_custom_field("/original_date") == iso_date
     assert manager.verify_pdf_hash() is True
