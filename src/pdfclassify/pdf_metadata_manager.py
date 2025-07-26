@@ -155,7 +155,10 @@ class PDFMetadataManager:
         Returns:
             Path: The new path to the renamed PDF
         """
-        new_pdf_path = Path(new_name).with_suffix(".pdf")
+        new_pdf_path = Path(new_name)
+        if new_pdf_path.suffix.lower() != ".pdf":
+            new_pdf_path = new_pdf_path.with_suffix(".pdf")
+
         new_sidecar_path = new_pdf_path.with_suffix(new_pdf_path.suffix + ".meta.json")
 
         # Ensure target directory exists
