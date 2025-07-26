@@ -139,8 +139,10 @@ class PdfProcess:
         """Rename/move file based on classification success or rejects."""
         if not rename:
             return None
+
         pdf_manager = PDFMetadataManager(self.pdf_file)
-        suffix = ".pdf"
+
+        # Determine base path and stem without adding ".pdf" here
         if prediction.success:
             base = output_path or self.pdf_file.parent
             label = prediction.label
@@ -152,10 +154,13 @@ class PdfProcess:
             stem = self.pdf_file.stem
 
         base.mkdir(parents=True, exist_ok=True)
-        dest = base / f"{stem}{suffix}"
+        dest = base / stem  # ← no ".pdf" appended here
+
         counter = 1
-        while dest.exists():
-            dest = base / f"{stem}_{counter}{suffix}"
+        while dest.with_suffix(".pdf").exists():
+            dest = base / f"{stem}_{counter}"
             counter += 1
+
+        # Pass dest without ".pdf"; rename_with_sidecar will enforce .pdf
         pdf_manager.rename_with_sidecar(dest)
-        return dest
+        return dest.with_suffix(".pdf")
