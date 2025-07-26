@@ -142,25 +142,27 @@ class PdfProcess:
 
         pdf_manager = PDFMetadataManager(self.pdf_file)
 
-        # Determine base path and stem without adding ".pdf" here
         if prediction.success:
             base = output_path or self.pdf_file.parent
             label = prediction.label
-            boost_manager = LabelBoostManager()
-            config = boost_manager.get(label)
+            config = LabelBoostManager().get(label)
             stem = config.final_name_pattern or label
         else:
             base = self.pdf_file.parent / "pdfclassify.rejects"
             stem = self.pdf_file.stem
 
         base.mkdir(parents=True, exist_ok=True)
-        dest = base / stem  # ← no ".pdf" appended here
 
+        # Ensure stem has no .pdf at the end
+        stem = Path(stem).stem
+
+        # Start with a single .pdf
+        dest = base / f"{stem}.pdf"
         counter = 1
-        while dest.with_suffix(".pdf").exists():
-            dest = base / f"{stem}_{counter}"
+        while dest.exists():
+            dest = base / f"{stem}_{counter}.pdf"
             counter += 1
 
-        # Pass dest without ".pdf"; rename_with_sidecar will enforce .pdf
+        # Now dest has exactly one .pdf and is unique
         pdf_manager.rename_with_sidecar(dest)
-        return dest.with_suffix(".pdf")
+        return dest
