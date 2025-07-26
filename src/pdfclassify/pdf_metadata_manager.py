@@ -21,6 +21,7 @@ class MyMetadata:
     confidence: Optional[float] = None
     sha256: Optional[str] = None
     preferred_context: Optional[list[str]] = None
+    minimum_parts: Optional[list[str]] = None
 
 
 class PDFMetadataManager:

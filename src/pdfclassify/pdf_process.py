@@ -113,7 +113,6 @@ class PdfProcess:
                 field_name="/confidence", value=label.confidence, overwrite=True
             )
 
-            # NEW: write /preferred_context from config if available
             boost_manager = LabelBoostManager()
             config = boost_manager.get(label.label)
             preferred_context = config.preferred_context
@@ -121,7 +120,11 @@ class PdfProcess:
                 pdf_manager.write_custom_field(
                     field_name="/preferred_context", value=preferred_context, overwrite=True
                 )
-
+            min_parts = config.minimum_parts
+            if min_parts:
+                pdf_manager.write_custom_field(
+                    field_name="/minimum_parts", value=min_parts, overwrite=True
+                )
         new_path = self.take_action(
             prediction=label,
             rename=not args.no_rename,
