@@ -47,7 +47,7 @@ class LabelBoostManager:
         config = self.get(label)
         score = config.get_boost_if_matched(text)
         if score > 0.0:
-            self.logger.info("Boosted %%s by %%.2f due to matching phrase", label, score)
+            self.logger.info("Boosted %s by %.2f due to matching phrase", label, score)
         return score
 
     def missing_labels(self) -> Set[str]:

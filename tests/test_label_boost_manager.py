@@ -5,6 +5,7 @@ and synchronization logic.
 """
 
 import json
+import logging
 import tempfile
 from pathlib import Path
 from unittest.mock import patch
@@ -91,3 +92,26 @@ def test_is_complete(patched_config):  # pylint: disable=unused-argument
     manager = LabelBoostManager()
     assert manager.is_complete("invoice")
     assert not manager.is_complete("receipt")
+
+
+def test_boost_score_logs_correctly(patched_config, caplog):
+    """Ensure boost_score logs without raising formatting errors."""
+    # Use a logger configured to propagate messages to caplog
+    logger = logging.getLogger("LabelBoostManagerTest")
+    logger.setLevel(logging.INFO)
+    caplog.set_level(logging.INFO)
+
+    # Inject logger into manager
+    manager = LabelBoostManager(logger=logger)
+
+    # The config already has 'invoice' with matching phrase "invoice number"
+    text = "Invoice Number: 12345"
+
+    # Calling boost_score should trigger a log message and not raise any errors
+    score = manager.boost_score("invoice", text)
+    assert score > 0  # must have triggered boost
+    # Assert there were no logging-related errors
+    for record in caplog.records:
+        assert "TypeError" not in record.getMessage()
+    # Verify that an informative log was produced
+    assert any("Boosted" in r.getMessage() for r in caplog.records)
