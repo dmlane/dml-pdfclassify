@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """Interactive CLI for managing label_boosts.json configuration with full
 DEVONthink and validation support."""
 
@@ -41,27 +42,46 @@ class LabelBoostCLI:
         self.boosts = LabelBoostManager()
         self.config = self.boosts.config
 
+        # Ensure preferred_context is always a list
         for entry in self.config.values():
             if entry.preferred_context is None:
                 entry.preferred_context = []
 
+        # Sync with any missing training labels
         if self.boosts.missing_labels():
             print("🔄 New training labels detected.")
             self.boosts.sync_with_training_labels(interactive=True)
             self.config = self.boosts.config
             self.boosts.save()
 
+        # Refresh DEVONthink groups if the app is running
         self._maybe_refresh_devonthink_groups()
 
+    def _is_devonthink_running(self) -> bool:
+        """Return True if DEVONthink is currently running."""
+        script = 'tell application "System Events" to (name of processes) contains "DEVONthink 3"'
+        try:
+            result = subprocess.run(
+                ["osascript", "-e", script],
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+            return result.stdout.strip().lower() == "true"
+        except subprocess.CalledProcessError:
+            return False
+
     def _maybe_refresh_devonthink_groups(self) -> None:
-        if not self._get_devonthink_groups():
-            refresh = questionary.confirm(
-                "Refresh DEVONthink group list?", style=CUSTOM_STYLE
-            ).ask()
-            if refresh:
-                self._get_devonthink_groups(force_refresh=True)
+        """Refresh DEVONthink groups only if DEVONthink is running, otherwise use cache."""
+        if self._is_devonthink_running():
+            print("🔄 DEVONthink is running — refreshing group list...")
+            self._get_devonthink_groups(force_refresh=True)
+        else:
+            print("ℹ️ DEVONthink is not running — using cached group list (if available).")
+            self._get_devonthink_groups(force_refresh=False)
 
     def _get_devonthink_groups(self, force_refresh: bool = False) -> List[str]:
+        """Retrieve DEVONthink group list from cache or AppleScript."""
         if LabelBoostCLI._devonthink_groups_cache and not force_refresh:
             return LabelBoostCLI._devonthink_groups_cache
 
@@ -75,6 +95,7 @@ class LabelBoostCLI:
             except (OSError, json.JSONDecodeError):
                 print("⚠️ Failed to load group cache. Will re-query DEVONthink.")
 
+        # Query AppleScript if refresh required
         script = """
         tell application id "DNtp"
           set theGroups to {}
@@ -112,29 +133,37 @@ class LabelBoostCLI:
             return []
 
     def _edit_label(self, label: str) -> None:
+        """Edit fields for the selected label with autocomplete for DEVONthink groups."""
         current = self.boosts.get(label)
         fields = list(current.to_dict().keys())
         updated = current.to_dict()
+        devonthink_groups = self._get_devonthink_groups()  # ✅ always cached list here
 
         print(f"\n🔧 Editing label: {label}\n")
         for field in fields:
             value = updated.get(field)
             default_str = ", ".join(value) if isinstance(value, list) else str(value)
-            answer = questionary.text(f"{field}", default=default_str, style=CUSTOM_STYLE).ask()
+
+            if field == "devonthink_group" and devonthink_groups:
+                answer = questionary.autocomplete(
+                    f"{field}",
+                    choices=devonthink_groups,
+                    default=default_str,
+                    style=CUSTOM_STYLE,
+                ).ask()
+            else:
+                answer = questionary.text(f"{field}", default=default_str, style=CUSTOM_STYLE).ask()
+
             try:
-                # 🔧 Convert to correct type before validation
+                # Convert answer to correct type
                 if field == "boost":
                     answer = float(answer)
                 elif field in ("preferred_context", "minimum_parts"):
                     if isinstance(answer, str):
                         try:
                             parsed = ast.literal_eval(answer)
-                            if isinstance(parsed, list):
-                                answer = parsed
-                            else:
-                                raise ValueError
-                        except Exception:  # pylint: disable=broad-exception-caught
-                            # fallback to naive comma-split
+                            answer = parsed if isinstance(parsed, list) else [answer]
+                        except Exception:
                             answer = [item.strip() for item in answer.split(",") if item.strip()]
 
                 updated[field] = LabelConfig.validate_field(field, answer)
@@ -146,7 +175,7 @@ class LabelBoostCLI:
         print("✅ Saved.")
 
     def run(self) -> None:
-        """Run the label boost CLI."""
+        """Run the interactive CLI."""
         while True:
             mode = questionary.select(
                 "Choose filter:",
@@ -186,8 +215,7 @@ class LabelBoostCLI:
                 ).ask()
 
                 if selected in (None, "back"):
-                    break  # go back to filter selection
-
+                    break
                 self._edit_label(selected)
 
 
