@@ -23,110 +23,106 @@ from dateparser import parse
 from pdfclassify._util import extract_text_from_pdf
 from pdfclassify.argument_handler import get_version
 
+# Short + long formats including day-month-year and short-year
 DATE_REGEXES = [
-    r"(?:0?[1-9]|1[0-2])[/-]20\d{2}",  # MM/YYYY
-    r"\b\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\b",  # DD/MM/YYYY or MM/DD/YY
-    r"\b\d{4}[/-]\d{1,2}[/-]\d{1,2}\b",  # YYYY-MM-DD
-    r"\b\d{1,2}\s+[a-zA-Zéêäöüßçñ]+\s+\d{4}\b",  # 17 May 2025
-    r"\b\d{1,2}\.\s*[a-zA-Zéêäöüßçñ]+\s+\d{4}\b",  # 17. Mai 2025
-    r"\b\d{1,2}\s+de\s+[a-zA-Zéêäöüßçñ]+\s+de\s+\d{4}\b",  # 17 de mayo de 2025
-    r"\b\d{1,2}\s+[a-zA-Zéêäöüßçñ]{3,}\.?\s+\d{4}\b",  # 17 mai. 2025
+    r"\b\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\b",  # e.g. 17/05/2025 or 17-05-25
+    r"\b\d{4}[/-]\d{1,2}[/-]\d{1,2}\b",  # e.g. 2025-05-17
+    r"\b\d{1,2}\s+[a-zA-Zéêäöüßçñ]+\s+\d{2,4}\b",  # e.g. 17 May 25
+    r"\b\d{1,2}\.\s*[a-zA-Zéêäöüßçñ]+\s+\d{4}\b",  # e.g. 17. Mai 2025
+    r"\b\d{1,2}\s+de\s+[a-zA-Zéêäöüßçñ]+\s+de\s+\d{4}\b",  # e.g. 17 de mayo de 2025
+    r"\b\d{1,2}\s+[a-zA-Zéêäöüßçñ]{3,}\.?\s+\d{4}\b",  # e.g. 17 mai. 2025
+    r"(?:0?[1-9]|1[0-2])[/-]20\d{2}",  # Month/Year (05/2025) → filtered later
 ]
 
 
-def get_preferred_contexts(pdf_file: Path) -> list[str]:
-    """Read /preferred_context from sidecar if available."""
-    meta_path = pdf_file.with_suffix(pdf_file.suffix + ".meta.json")
-    if not meta_path.exists():
-        return []
-    try:
-        with meta_path.open("r", encoding="utf-8") as meta_file:
-            meta = json.load(meta_file)
-        return meta.get("/preferred_context", [])
-    except (json.JSONDecodeError, TypeError):
-        return []
-
-
 def get_minimum_parts(pdf_file: Path) -> list[str]:
-    """Read /minimum_parts from sidecar if available, otherwise return default."""
+    """Read /minimum_parts from .meta.json if present, else default to day,month,year."""
     meta_path = pdf_file.with_suffix(pdf_file.suffix + ".meta.json")
-    if not meta_path.exists():
-        return ["day", "month", "year"]
-    try:
-        with meta_path.open("r", encoding="utf-8") as meta_file:
-            meta = json.load(meta_file)
-        return meta.get("/minimum_parts", ["day", "month", "year"])
-    except (json.JSONDecodeError, TypeError):
-        return ["day", "month", "year"]
+    if meta_path.exists():
+        try:
+            with meta_path.open("r", encoding="utf-8") as f:
+                meta = json.load(f)
+            return meta.get("/minimum_parts", ["day", "month", "year"])
+        except (json.JSONDecodeError, OSError):
+            return ["day", "month", "year"]
+    return ["day", "month", "year"]
+
+
+def get_preferred_contexts(pdf_file: Path) -> list[str]:
+    """Read /preferred_context from sidecar if present."""
+    meta_path = pdf_file.with_suffix(pdf_file.suffix + ".meta.json")
+    if meta_path.exists():
+        try:
+            with meta_path.open("r", encoding="utf-8") as meta_file:
+                meta = json.load(meta_file)
+            return meta.get("/preferred_context", [])
+        except (json.JSONDecodeError, TypeError):
+            return []
+    return []
 
 
 def has_required_parts(date_str: str, minimum_parts: list[str]) -> bool:
-    """Return True if the date string contains all required parts."""
+    """Ensure the original date string explicitly contains all required parts."""
     checks = {
-        "day": re.search(r"\b\d{1,2}\b", date_str) is not None,
-        "month": re.search(r"\b(0?[1-9]|1[0-2]|[a-zA-Zéêäöüßçñ]+)\b", date_str) is not None,
-        "year": re.search(r"\b\d{4}\b", date_str) is not None,
+        "day": bool(re.search(r"\b([0-2]?\d|3[01])\b", date_str)),
+        "month": bool(re.search(r"\b(0?[1-9]|1[0-2]|[a-zA-Zéêäöüßçñ]+)\b", date_str)),
+        "year": bool(re.search(r"\b\d{4}\b", date_str)),
     }
     return all(checks[p] for p in minimum_parts)
 
 
-def find_all_dates(text: str, minimum_parts: list[str]) -> list[tuple[datetime, str]]:
-    """Return a list of (datetime, matched_string) for all
-    detected dates that match minimum_parts."""
+def find_all_dates(
+    text: str, languages: list[str], minimum_parts: list[str]
+) -> list[tuple[datetime, str]]:
+    """Return list of (datetime, matched text) for all valid dates."""
     found = set()
     results: list[tuple[datetime, str]] = []
+    settings = {"PREFER_DAY_OF_MONTH": "first", "DATE_ORDER": "DMY"}
 
     for pattern in DATE_REGEXES:
         for match in re.findall(pattern, text, flags=re.IGNORECASE):
             if match in found:
                 continue
+            parsed = parse(match, languages=languages, settings=settings)
+            if not parsed or parsed.year < 2020:
+                continue
+            # ✅ enforce explicit parts
             if not has_required_parts(match, minimum_parts):
                 continue
-            parsed = parse(
-                match,
-                languages=["en", "fr", "de", "es"],
-                settings={
-                    "PREFER_DAY_OF_MONTH": "first",
-                    "DATE_ORDER": "DMY",
-                },
-            )
-            if parsed and parsed.year >= 2020:
-                found.add(match)
-                results.append((parsed, match.strip()))
-
+            found.add(match)
+            results.append((parsed, match.strip()))
     return results
 
 
 def date_from_context(
-    text: str, contexts: list[str], minimum_parts: list[str]
+    text: str, contexts: list[str], languages: list[str], minimum_parts: list[str]
 ) -> Optional[tuple[datetime, str]]:
-    """Try to locate a date where the context keyword appears before the date."""
+    """Find first date where a context keyword precedes it on the same line."""
+    settings = {"PREFER_DAY_OF_MONTH": "first", "DATE_ORDER": "DMY"}
     lowered_contexts = [c.lower() for c in contexts]
 
     for line in text.splitlines():
         line_lower = line.lower()
         for ctx in lowered_contexts:
-            if ctx not in line_lower:
+            ctx_index = line_lower.find(ctx)
+            if ctx_index == -1:
                 continue
             for pattern in DATE_REGEXES:
                 for match in re.finditer(pattern, line, flags=re.IGNORECASE):
-                    if not has_required_parts(match.group(), minimum_parts):
-                        continue
-                    parsed = parse(
-                        match.group(),
-                        languages=["en", "fr", "de", "es"],
-                        settings={
-                            "PREFER_DAY_OF_MONTH": "first",
-                            "DATE_ORDER": "DMY",
-                        },
-                    )
-                    if parsed and parsed.year >= 2020:
-                        return parsed, match.group().strip()
+                    if match.start() > ctx_index:
+                        raw = match.group()
+                        parsed = parse(raw, languages=languages, settings=settings)
+                        if (
+                            parsed
+                            and parsed.year >= 2020
+                            and has_required_parts(raw, minimum_parts)
+                        ):
+                            return parsed, raw.strip()
     return None
 
 
 def format_with_template(date_obj: datetime, template: Optional[str]) -> str:
-    """Replace YYYY, MM, DD placeholders in template or return YYYYMMDD."""
+    """Replace YYYY, MM, DD placeholders in template or default YYYYMMDD."""
     if template:
         return (
             template.replace("YYYY", f"{date_obj.year:04d}")
@@ -137,26 +133,24 @@ def format_with_template(date_obj: datetime, template: Optional[str]) -> str:
 
 
 def main() -> None:
-    """Parse args, extract dates, and print result or list."""
-    parser = argparse.ArgumentParser(
-        description="Extract the nth date from a PDF and apply formatting."
-    )
+    """Parse arguments, extract dates, and print result or list."""
+    parser = argparse.ArgumentParser(description="Extract the nth date from a PDF.")
     parser.add_argument("pdf_file", type=Path, help="Path to the PDF file.")
     parser.add_argument("-n", "--nth", type=int, default=1, help="Which date to extract (1-based).")
     parser.add_argument("-t", "--template", type=str, help="Template like 'invoice_YYYYMMDD'.")
     parser.add_argument("-c", "--convert", action="store_true", help="Use filename as template.")
-    parser.add_argument("--list", action="store_true", help="List all matched dates and exit.")
+    parser.add_argument("--list", action="store_true", help="List all matched dates.")
     parser.add_argument("-V", "--version", action="version", version=f"%(prog)s {get_version()}")
 
     args = parser.parse_args()
-
+    languages = ["en", "fr", "de", "es"]
     text = extract_text_from_pdf(args.pdf_file)
     minimum_parts = get_minimum_parts(args.pdf_file)
 
     # Try context-aware extraction
     preferred_contexts = get_preferred_contexts(args.pdf_file)
     if preferred_contexts:
-        result = date_from_context(text, preferred_contexts, minimum_parts)
+        result = date_from_context(text, preferred_contexts, languages, minimum_parts)
         if result:
             date_obj, _ = result
             template = args.pdf_file.name if args.convert else args.template
@@ -164,7 +158,7 @@ def main() -> None:
             return
 
     # Fallback: generic extraction
-    dates = find_all_dates(text, minimum_parts)
+    dates = find_all_dates(text, languages, minimum_parts)
 
     if args.list:
         if dates:
