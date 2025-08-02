@@ -1,4 +1,13 @@
-"""Manipulate the name and/or metadata of a PDF file."""
+#!/usr/bin/env python3
+"""
+Manipulate the name and/or metadata of a PDF file.
+
+- Saves original filename and date in custom metadata if missing.
+- Predicts classification, applies label-specific configurations.
+- Writes classification, confidence, preferred_context, minimum_parts,
+  and devonthink_group to the sidecar.
+- Renames or moves PDF (and its sidecar) according to classification rules.
+"""
 
 import os
 import shutil
@@ -23,7 +32,7 @@ class PdfProcess:
         if not self.pdf_file.is_file():
             raise MyException(f"File {pdf_path} does not exist", 1)
 
-        # ── skip zero-length iCloud placeholder PDFs ──
+        # ── Skip zero-length iCloud placeholder PDFs ──
         try:
             size = self.pdf_file.stat().st_size
             try:
@@ -49,7 +58,7 @@ class PdfProcess:
         PDFMetadataManager(self.pdf_file).print_metadata()
 
     def _save_metadata(self) -> None:
-        """Write /Original_Filename and /Original_Date if not already present."""
+        """Write /original_filename and /original_date if not already present."""
         try:
             pdf_manager = PDFMetadataManager(self.pdf_file)
             mod_date = datetime.fromtimestamp(self.pdf_file.stat().st_mtime).isoformat()
@@ -103,6 +112,7 @@ class PdfProcess:
                 print(f"File moved to: {dest}")
                 return
             raise
+
         # Regular processing
         print(f"Predicted label: {label.label} with confidence {label.confidence:.2f}")
         if label.success:
@@ -115,16 +125,26 @@ class PdfProcess:
 
             boost_manager = LabelBoostManager()
             config = boost_manager.get(label.label)
-            preferred_context = config.preferred_context
-            if preferred_context:
+
+            # ✅ Save preferred_context
+            if config.preferred_context:
                 pdf_manager.write_custom_field(
-                    field_name="/preferred_context", value=preferred_context, overwrite=True
+                    field_name="/preferred_context", value=config.preferred_context, overwrite=True
                 )
-            min_parts = config.minimum_parts
-            if min_parts:
+
+            # ✅ Save minimum_parts
+            if config.minimum_parts:
                 pdf_manager.write_custom_field(
-                    field_name="/minimum_parts", value=min_parts, overwrite=True
+                    field_name="/minimum_parts", value=config.minimum_parts, overwrite=True
                 )
+
+            # ✅ NEW: Save devonthink_group if present
+            if config.devonthink_group:
+                pdf_manager.write_custom_field(
+                    field_name="/devonthink_group", value=config.devonthink_group, overwrite=True
+                )
+
+        # ✅ Rename/move file as needed
         new_path = self.take_action(
             prediction=label,
             rename=not args.no_rename,
@@ -139,7 +159,7 @@ class PdfProcess:
         rename: bool = True,
         output_path: Path | None = None,
     ) -> Path | None:
-        """Rename/move file based on classification success or rejects."""
+        """Rename/move file based on classification success or rejection."""
         if not rename:
             return None
 
@@ -159,13 +179,13 @@ class PdfProcess:
         # Ensure stem has no .pdf at the end
         stem = Path(stem).stem
 
-        # Start with a single .pdf
+        # Ensure unique file name
         dest = base / f"{stem}.pdf"
         counter = 1
         while dest.exists():
             dest = base / f"{stem}_{counter}.pdf"
             counter += 1
 
-        # Now dest has exactly one .pdf and is unique
+        # Rename PDF and sidecar together
         pdf_manager.rename_with_sidecar(dest)
         return dest
