@@ -1,13 +1,15 @@
 #!/usr/bin/env python3
 """
 PDF Classification Verifier with:
-- Progress counter
+- Progress counter (top)
+- Status message (bottom)
 - Skip reviewed files (unless --all)
 - Vertical scroll, auto width scaling
 - Review status (✅/❌)
 - Undo & date renaming
 - Keyboard shortcuts (works on macOS)
 - --help for usage and shortcuts
+- In-GUI Help button showing shortcuts
 """
 
 import argparse
@@ -61,24 +63,19 @@ class PDFReviewer(QWidget):
         self.rendered_pixmap = None
         self._image_buffer = None
 
-        # Allow keyboard focus
         self.setFocusPolicy(Qt.StrongFocus)
-
-        # --- UI Layout ---
         self.setWindowTitle("PDF Classification Verifier")
         self.resize(900, 1000)
 
+        # ========= Layout =========
         main_layout = QVBoxLayout()
 
-        # Progress & Status Labels
+        # Top progress label
         self.progress_label = QLabel("")
         self.progress_label.setAlignment(Qt.AlignCenter)
-        self.status_line = QLabel("Ready")
-        self.status_line.setAlignment(Qt.AlignCenter)
         main_layout.addWidget(self.progress_label)
-        main_layout.addWidget(self.status_line)
 
-        # Scrollable PDF View
+        # Scrollable PDF display
         self.scroll_area = QScrollArea()
         self.pdf_label = QLabel()
         self.pdf_label.setAlignment(Qt.AlignCenter)
@@ -86,7 +83,12 @@ class PDFReviewer(QWidget):
         self.scroll_area.setWidgetResizable(True)
         main_layout.addWidget(self.scroll_area, stretch=1)
 
-        # Buttons
+        # Bottom status line (moved here)
+        self.status_line = QLabel("Ready")
+        self.status_line.setAlignment(Qt.AlignCenter)
+        main_layout.addWidget(self.status_line)
+
+        # Buttons row
         btn_layout = QHBoxLayout()
         self.btn_prev_page = QPushButton("◀ Page")
         self.btn_next_page = QPushButton("Page ▶")
@@ -94,6 +96,7 @@ class PDFReviewer(QWidget):
         self.btn_reject = QPushButton("❌ Reject")
         self.btn_undo = QPushButton("↩ Undo")
         self.btn_change_date = QPushButton("📅 Change Date")
+        self.btn_help = QPushButton("❔ Help")
         self.btn_next_file = QPushButton("Next ➡")
 
         for b in [
@@ -103,6 +106,7 @@ class PDFReviewer(QWidget):
             self.btn_reject,
             self.btn_undo,
             self.btn_change_date,
+            self.btn_help,
             self.btn_next_file,
         ]:
             btn_layout.addWidget(b)
@@ -110,7 +114,7 @@ class PDFReviewer(QWidget):
 
         self.setLayout(main_layout)
 
-        # --- Button Bindings ---
+        # ========= Button Bindings =========
         self.btn_prev_page.clicked.connect(self.prev_page)
         self.btn_next_page.clicked.connect(self.next_page)
         self.btn_confirm.clicked.connect(lambda: self.set_status("confirmed"))
@@ -118,6 +122,7 @@ class PDFReviewer(QWidget):
         self.btn_undo.clicked.connect(self.undo_action)
         self.btn_change_date.clicked.connect(self.change_date)
         self.btn_next_file.clicked.connect(self.next_file)
+        self.btn_help.clicked.connect(self.show_shortcuts)
 
         # Load first PDF
         self.load_current_pdf()
@@ -125,9 +130,7 @@ class PDFReviewer(QWidget):
     # ========= Collect PDFs =========
     def _collect_pdfs(self):
         pdfs = sorted(self.folder.glob("*.pdf"))
-        if not self.review_all:
-            return [p for p in pdfs if not self._has_review_status(p)]
-        return pdfs
+        return [p for p in pdfs if not self._has_review_status(p)] if not self.review_all else pdfs
 
     def _has_review_status(self, pdf_path: Path) -> bool:
         sidecar = pdf_path.with_name(f"{pdf_path.name}.meta.json")
@@ -149,7 +152,7 @@ class PDFReviewer(QWidget):
         self.doc = fitz.open(pdf_path)
         self.current_page = 0
         self.render_current_page()
-        self.setFocus()  # ensure keyboard focus
+        self.setFocus()
 
     def render_current_page(self):
         page = self.doc[self.current_page]
@@ -193,8 +196,7 @@ class PDFReviewer(QWidget):
         return self.pdf_files[self.current_index]
 
     def get_sidecar(self):
-        pdf = self.get_current_pdf()
-        return pdf.with_name(f"{pdf.name}.meta.json")
+        return self.get_current_pdf().with_name(f"{self.get_current_pdf().name}.meta.json")
 
     def current_pdf_name(self):
         return self.get_current_pdf().name
@@ -274,6 +276,10 @@ class PDFReviewer(QWidget):
 
         self.pdf_files[self.current_index] = new_pdf
         self.status_line.setText(f"Renamed to {new_name}")
+
+    # ========= In-GUI Help =========
+    def show_shortcuts(self):
+        QMessageBox.information(self, "Keyboard Shortcuts", SHORTCUTS)
 
     # ========= Keyboard Shortcuts =========
     def keyPressEvent(self, event: QKeyEvent):
