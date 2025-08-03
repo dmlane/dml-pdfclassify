@@ -15,8 +15,8 @@ def test_metadata_written_for_valid_pdf(valid_pdf_file: Path) -> None:
     _ = PdfProcess(str(valid_pdf_file))
     manager = PDFMetadataManager(valid_pdf_file)
 
-    assert manager.read_custom_field("/original_filename") == "blank.pdf"
-    assert manager.read_custom_field("/original_date") is not None
+    assert manager.read_custom_field("original_filename") == "blank.pdf"
+    assert manager.read_custom_field("original_date") is not None
 
 
 def test_invalid_pdf_raises_exception(invalid_pdf_file: Path) -> None:

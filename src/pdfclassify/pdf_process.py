@@ -58,14 +58,14 @@ class PdfProcess:
         PDFMetadataManager(self.pdf_file).print_metadata()
 
     def _save_metadata(self) -> None:
-        """Write /original_filename and /original_date if not already present."""
+        """Write original_filename and original_date if not already present."""
         try:
             pdf_manager = PDFMetadataManager(self.pdf_file)
             mod_date = datetime.fromtimestamp(self.pdf_file.stat().st_mtime).isoformat()
-            if pdf_manager.read_custom_field("/original_filename") is None:
-                pdf_manager.write_custom_field("/original_filename", self.pdf_file.name)
-            if pdf_manager.read_custom_field("/original_date") is None:
-                pdf_manager.write_custom_field("/original_date", mod_date)
+            if pdf_manager.read_custom_field("original_filename") is None:
+                pdf_manager.write_custom_field("original_filename", self.pdf_file.name)
+            if pdf_manager.read_custom_field("original_date") is None:
+                pdf_manager.write_custom_field("original_date", mod_date)
         except PdfReadError as e:
             raise MyException(f"Invalid PDF file: {e}", 2) from e
         except Exception as e:
@@ -75,8 +75,8 @@ class PdfProcess:
         """Restore filename and timestamp from sidecar metadata fields."""
         pdf_manager = PDFMetadataManager(self.pdf_file)
 
-        orig_name = pdf_manager.read_custom_field("/original_filename")
-        orig_date = pdf_manager.read_custom_field("/original_date")
+        orig_name = pdf_manager.read_custom_field("original_filename")
+        orig_date = pdf_manager.read_custom_field("original_date")
 
         # Rename file (and sidecar) if original name is present
         if orig_name and orig_name != self.pdf_file.name:
@@ -117,10 +117,10 @@ class PdfProcess:
         print(f"Predicted label: {label.label} with confidence {label.confidence:.2f}")
         if label.success:
             pdf_manager.write_custom_field(
-                field_name="/classification", value=label.label, overwrite=True
+                field_name="classification", value=label.label, overwrite=True
             )
             pdf_manager.write_custom_field(
-                field_name="/confidence", value=label.confidence, overwrite=True
+                field_name="confidence", value=label.confidence, overwrite=True
             )
 
             boost_manager = LabelBoostManager()
@@ -135,13 +135,13 @@ class PdfProcess:
             # ✅ Save minimum_parts
             if config.minimum_parts:
                 pdf_manager.write_custom_field(
-                    field_name="/minimum_parts", value=config.minimum_parts, overwrite=True
+                    field_name="minimum_parts", value=config.minimum_parts, overwrite=True
                 )
 
             # ✅ NEW: Save devonthink_group if present
             if config.devonthink_group:
                 pdf_manager.write_custom_field(
-                    field_name="/devonthink_group", value=config.devonthink_group, overwrite=True
+                    field_name="devonthink_group", value=config.devonthink_group, overwrite=True
                 )
 
         # ✅ Rename/move file as needed

@@ -56,7 +56,7 @@ class PDFMetadataManager:
 
     def _save_metadata(self, metadata: dict) -> None:
         """Save metadata to the sidecar file."""
-        metadata["/sha256"] = self._calculate_pdf_hash()
+        metadata["sha256"] = self._calculate_pdf_hash()
         with self.sidecar_path.open("w", encoding="utf-8") as f:
             json.dump(metadata, f, indent=2, ensure_ascii=False)
 
@@ -82,19 +82,19 @@ class PDFMetadataManager:
     def get_structured_metadata(self) -> MyMetadata:
         """Load sidecar metadata into a structured dataclass."""
         data = self._load_metadata()
-        return MyMetadata(**{f.name: data.get("/" + f.name.lower()) for f in fields(MyMetadata)})
+        return MyMetadata(**{f.name: data.get(f.name.lower()) for f in fields(MyMetadata)})
 
     def read_custom_field(self, field_name: str) -> Optional[Union[str, float, int]]:
         """
         Read a custom field from the sidecar.
 
         Args:
-            field_name (str): Field name (e.g., "/Classification")
+            field_name (str): Field name (e.g., "classification")
 
         Returns:
             Optional[str]: The value, or None if missing
         """
-        return self._load_metadata().get(field_name)
+        return self._load_metadata().get(field_name.lower())
 
     def write_custom_field(
         self,
@@ -106,7 +106,7 @@ class PDFMetadataManager:
         Write or update a custom metadata field in the sidecar.
 
         Args:
-            field_name (str): The name of the field (e.g., "/classification")
+            field_name (str): The name of the field (e.g., "classification")
             value (str | float | int | list[str]): The value to set
             overwrite (bool): If False, will skip writing if field exists
 
@@ -140,8 +140,9 @@ class PDFMetadataManager:
             field_name (str): The field name to delete
         """
         metadata = self._load_metadata()
-        if field_name in metadata:
-            metadata.pop(field_name)
+        normalized_key = field_name.lower()
+        if normalized_key in metadata:
+            metadata.pop(normalized_key)
             self._save_metadata(metadata)
 
     def rename_with_sidecar(self, new_name: str | Path) -> Path:
@@ -180,7 +181,7 @@ class PDFMetadataManager:
 
     def verify_pdf_hash(self) -> bool:
         """Verify that the current PDF matches the SHA-256 hash in the sidecar."""
-        stored = self.read_custom_field("/sha256")
+        stored = self.read_custom_field("sha256")
         if not stored:
             return False
         return stored == self._calculate_pdf_hash()

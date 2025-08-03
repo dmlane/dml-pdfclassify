@@ -30,7 +30,7 @@ def tmp_meta_file(tmp_path):
 
 
 def write_meta(meta_path: Path, min_parts, preferred_context=None):
-    data = {"/minimum_parts": min_parts}
+    data = {"minimum_parts": min_parts}
     if preferred_context:
         data["/preferred_context"] = preferred_context
     with meta_path.open("w", encoding="utf-8") as f:

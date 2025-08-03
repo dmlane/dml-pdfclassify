@@ -32,7 +32,7 @@ def load_minimum_parts(pdf_file: Path) -> list[str]:
     if meta_path.exists():
         try:
             with meta_path.open("r", encoding="utf-8") as f:
-                return json.load(f).get("/minimum_parts", ["day", "month", "year"])
+                return json.load(f).get("minimum_parts", ["day", "month", "year"])
         except json.JSONDecodeError:
             pass
     return ["day", "month", "year"]
