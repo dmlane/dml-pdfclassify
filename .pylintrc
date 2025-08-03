@@ -575,6 +575,8 @@ ignored-checks-for-mixins=no-member,
 # qualified names.
 ignored-classes=optparse.Values,thread._local,_thread._local,argparse.Namespace,Struct
 
+ignored-modules=PySide6.QtCore,PySide6.QtGui,PySide6.QtWidgets
+
 # Show a hint with possible names when a member name was not found. The aspect
 # of finding the hint is based on edit distance.
 missing-member-hint=yes

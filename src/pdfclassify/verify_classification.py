@@ -1,15 +1,17 @@
 #!/usr/bin/env python3
 """
-PDF Classification Verifier with:
-- Progress counter (top)
-- Status message (bottom)
-- Skip reviewed files (unless --all)
-- Vertical scroll, auto width scaling
-- Review status (✅/❌)
-- Undo & date renaming
-- Keyboard shortcuts (works on macOS)
-- --help for usage and shortcuts
-- In-GUI Help button showing shortcuts
+PDF Classification Verifier GUI.
+
+This tool allows interactive review of classified PDFs using a Qt-based interface.
+Features:
+- Progress counter (top) and status message (bottom)
+- Skip reviewed files unless --all is specified
+- Vertical scroll with auto width scaling
+- Displays review status (✅/❌)
+- Supports undo and date renaming
+- Keyboard shortcuts for navigation and actions
+- --help flag for usage and shortcuts
+- In-GUI Help button listing all shortcuts
 """
 
 import argparse
@@ -49,10 +51,20 @@ Keyboard Shortcuts:
 """
 
 
+# pylint: disable=too-many-instance-attributes
 class PDFReviewer(QWidget):
+    """Qt GUI class for reviewing classified PDFs and updating sidecar metadata."""
+
     DATE_PATTERN = re.compile(r"(.*_)(\d{4}(?:\d{2}(?:\d{2})?)?)\.pdf$", re.IGNORECASE)
 
     def __init__(self, folder: Path, review_all: bool):
+        """
+        Initialize the PDF reviewer window.
+
+        Args:
+            folder (Path): Folder containing classified PDFs to review.
+            review_all (bool): If True, review all PDFs including already reviewed.
+        """
         super().__init__()
         self.folder = folder
         self.review_all = review_all
@@ -83,7 +95,7 @@ class PDFReviewer(QWidget):
         self.scroll_area.setWidgetResizable(True)
         main_layout.addWidget(self.scroll_area, stretch=1)
 
-        # Bottom status line (moved here)
+        # Bottom status line
         self.status_line = QLabel("Ready")
         self.status_line.setAlignment(Qt.AlignCenter)
         main_layout.addWidget(self.status_line)
@@ -129,10 +141,20 @@ class PDFReviewer(QWidget):
 
     # ========= Collect PDFs =========
     def _collect_pdfs(self):
+        """Collect PDF files from the folder, optionally skipping reviewed ones."""
         pdfs = sorted(self.folder.glob("*.pdf"))
         return [p for p in pdfs if not self._has_review_status(p)] if not self.review_all else pdfs
 
     def _has_review_status(self, pdf_path: Path) -> bool:
+        """
+        Check if the PDF has already been reviewed.
+
+        Args:
+            pdf_path (Path): Path to the PDF file.
+
+        Returns:
+            bool: True if review_status is present in the sidecar, False otherwise.
+        """
         sidecar = pdf_path.with_name(f"{pdf_path.name}.meta.json")
         if sidecar.exists():
             try:
@@ -143,6 +165,7 @@ class PDFReviewer(QWidget):
 
     # ========= PDF Rendering =========
     def load_current_pdf(self):
+        """Load the current PDF file for display."""
         if self.current_index >= len(self.pdf_files):
             self.progress_label.setText("All PDFs reviewed ✅")
             self.status_line.setText("")
@@ -155,6 +178,7 @@ class PDFReviewer(QWidget):
         self.setFocus()
 
     def render_current_page(self):
+        """Render the current PDF page into an image for display."""
         page = self.doc[self.current_page]
         pix = page.get_pixmap(matrix=fitz.Matrix(2, 2))
         self._image_buffer = bytes(pix.samples)
@@ -165,6 +189,7 @@ class PDFReviewer(QWidget):
         self.update_status_bar()
 
     def update_displayed_image(self):
+        """Update the displayed image with scaling to fit the viewport width."""
         if self.rendered_pixmap:
             scaled = self.rendered_pixmap.scaledToWidth(
                 self.scroll_area.viewport().width(), Qt.SmoothTransformation
@@ -173,36 +198,44 @@ class PDFReviewer(QWidget):
             self.pdf_label.adjustSize()
 
     def resizeEvent(self, event):
+        """Handle window resize events to rescale the PDF display."""
         super().resizeEvent(event)
         self.update_displayed_image()
 
     # ========= Navigation =========
     def next_page(self):
+        """Navigate to the next page of the current PDF."""
         if self.current_page < len(self.doc) - 1:
             self.current_page += 1
             self.render_current_page()
 
     def prev_page(self):
+        """Navigate to the previous page of the current PDF."""
         if self.current_page > 0:
             self.current_page -= 1
             self.render_current_page()
 
     def next_file(self):
+        """Move to the next PDF in the list."""
         self.current_index += 1
         self.load_current_pdf()
 
     # ========= Utilities =========
     def get_current_pdf(self):
+        """Return the Path of the currently displayed PDF."""
         return self.pdf_files[self.current_index]
 
     def get_sidecar(self):
+        """Return the Path to the sidecar JSON of the current PDF."""
         return self.get_current_pdf().with_name(f"{self.get_current_pdf().name}.meta.json")
 
     def current_pdf_name(self):
+        """Return the filename of the current PDF."""
         return self.get_current_pdf().name
 
     # ========= Status Handling =========
     def read_status(self):
+        """Read the review status from the sidecar JSON file."""
         s = self.get_sidecar()
         if s.exists():
             try:
@@ -212,6 +245,12 @@ class PDFReviewer(QWidget):
         return None
 
     def write_status(self, status):
+        """
+        Write the review status to the sidecar JSON file.
+
+        Args:
+            status (str): The new review status ('confirmed' or 'rejected').
+        """
         sidecar = self.get_sidecar()
         backup = sidecar.read_text() if sidecar.exists() else "{}"
         ACTIONS_STACK.append((self.current_index, backup))
@@ -225,11 +264,18 @@ class PDFReviewer(QWidget):
         sidecar.write_text(json.dumps(data, indent=2))
 
     def set_status(self, status):
+        """
+        Set and save the review status, then move to the next file.
+
+        Args:
+            status (str): 'confirmed' or 'rejected'
+        """
         self.write_status(status)
         self.status_line.setText(f"{self.current_pdf_name()} marked {status}")
         self.next_file()
 
     def undo_action(self):
+        """Undo the last status change by restoring the previous sidecar content."""
         if not ACTIONS_STACK:
             self.status_line.setText("Nothing to undo.")
             return
@@ -241,6 +287,7 @@ class PDFReviewer(QWidget):
         self.status_line.setText(f"Undo applied to {self.current_pdf_name()}")
 
     def update_status_bar(self):
+        """Update the top progress bar with current file index and status."""
         total = len(self.pdf_files)
         st = self.read_status()
         icon = "✅" if st == "confirmed" else ("❌" if st == "rejected" else "")
@@ -250,6 +297,7 @@ class PDFReviewer(QWidget):
 
     # ========= 📅 Change Date =========
     def change_date(self):
+        """Prompt the user to change the date in the current filename."""
         pdf_path = self.get_current_pdf()
         match = self.DATE_PATTERN.match(pdf_path.name)
         if not match:
@@ -279,10 +327,13 @@ class PDFReviewer(QWidget):
 
     # ========= In-GUI Help =========
     def show_shortcuts(self):
+        """Display a popup window listing all keyboard shortcuts."""
         QMessageBox.information(self, "Keyboard Shortcuts", SHORTCUTS)
 
     # ========= Keyboard Shortcuts =========
+    # pylint: disable=invalid-name
     def keyPressEvent(self, event: QKeyEvent):
+        """Handle keyboard events to trigger navigation and actions."""
         key = event.key()
         if key == Qt.Key_Left:
             self.prev_page()
@@ -306,6 +357,7 @@ class PDFReviewer(QWidget):
 
 # ========= CLI =========
 def parse_args():
+    """Parse command-line arguments."""
     parser = argparse.ArgumentParser(
         description="Review classified PDFs, confirm/reject, and update sidecar metadata.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -320,16 +372,23 @@ def parse_args():
 
 # ========= Entry Point =========
 def main():
+    """Entry point for the PDF Classification Verifier GUI."""
     args = parse_args()
     app = QApplication(sys.argv)
-    folder = (
-        Path(args.folder)
-        if args.folder
-        else Path(QFileDialog.getExistingDirectory(None, "Select Classified PDFs"))
-    )
-    if not folder or not folder.exists():
-        print("No folder selected or folder does not exist.")
+
+    if args.folder:
+        folder = Path(args.folder)
+    else:
+        selected_dir = QFileDialog.getExistingDirectory(None, "Select Classified PDFs")
+        if not selected_dir:  # user cancelled
+            print("No folder selected, exiting.")
+            sys.exit(1)
+        folder = Path(selected_dir)
+
+    if not folder.exists():
+        print(f"Folder '{folder}' does not exist, exiting.")
         sys.exit(1)
+
     viewer = PDFReviewer(folder, args.all)
     viewer.show()
     sys.exit(app.exec())
