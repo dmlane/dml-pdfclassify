@@ -25,7 +25,6 @@ from PySide6.QtCore import Qt
 from PySide6.QtGui import QImage, QKeyEvent, QPixmap
 from PySide6.QtWidgets import (
     QApplication,
-    QFileDialog,
     QHBoxLayout,
     QInputDialog,
     QLabel,
@@ -376,15 +375,12 @@ def main():
     args = parse_args()
     app = QApplication(sys.argv)
 
-    if args.folder:
-        folder = Path(args.folder)
-    else:
-        selected_dir = QFileDialog.getExistingDirectory(None, "Select Classified PDFs")
-        if not selected_dir:  # user cancelled
-            print("No folder selected, exiting.")
-            sys.exit(1)
-        folder = Path(selected_dir)
+    # ✅ Exit early if no folder argument provided
+    if not args.folder:
+        print("No folder argument provided, exiting.")
+        sys.exit(1)
 
+    folder = Path(args.folder)
     if not folder.exists():
         print(f"Folder '{folder}' does not exist, exiting.")
         sys.exit(1)
