@@ -81,27 +81,42 @@ class LabelBoostCLI:
             self._get_devonthink_groups(force_refresh=False)
 
     def _get_devonthink_groups(self, force_refresh: bool = False) -> List[str]:
-        """Retrieve DEVONthink group list from cache or AppleScript."""
+        """Retrieve DEVONthink leaf group list, excluding 'Inbox/*' paths, filtering in Python."""
         if LabelBoostCLI._devonthink_groups_cache and not force_refresh:
             return LabelBoostCLI._devonthink_groups_cache
 
+        def _filter_leaf_groups(groups: List[str]) -> List[str]:
+            """Remove groups starting with 'Inbox//' and keep only leaf groups."""
+            # Remove groups that literally start with 'Inbox//'
+            filtered = [g for g in groups if not g.startswith("Inbox//")]
+
+            # Keep only leaf groups (those that are not a prefix of another group)
+            leaf_groups = []
+            for g in sorted(filtered, key=len):
+                if not any(g != other and other.startswith(g + "/") for other in filtered):
+                    leaf_groups.append(g)
+
+            return leaf_groups
+
+        # ✅ Try cached file first
         if not force_refresh and CACHE_PATH.exists():
             try:
                 with open(CACHE_PATH, "r", encoding="utf-8") as f:
                     cached = json.load(f)
                     if isinstance(cached, list):
-                        LabelBoostCLI._devonthink_groups_cache = cached
-                        return cached
+                        filtered = _filter_leaf_groups(cached)
+                        LabelBoostCLI._devonthink_groups_cache = filtered
+                        return filtered
             except (OSError, json.JSONDecodeError):
                 print("⚠️ Failed to load group cache. Will re-query DEVONthink.")
 
-        # Query AppleScript if refresh required
+        # ✅ Query DEVONthink via AppleScript
         script = """
         tell application id "DNtp"
           set theGroups to {}
           repeat with theDatabase in databases
             repeat with theRecord in (get every parent of theDatabase whose tag type is not ordinary tag)
-              set end of theGroups to (name of theDatabase & (location of theRecord) & name of theRecord)
+              set end of theGroups to (name of theDatabase & "/" & (location of theRecord) & name of theRecord)
             end repeat
           end repeat
           return theGroups
@@ -123,11 +138,15 @@ class LabelBoostCLI:
                 print(raw_output)
                 groups = []
 
-            LabelBoostCLI._devonthink_groups_cache = groups
+            # ✅ Apply filtering only in Python
+            filtered = _filter_leaf_groups(groups)
+
+            # ✅ Cache the filtered list
+            LabelBoostCLI._devonthink_groups_cache = filtered
             CACHE_PATH.parent.mkdir(parents=True, exist_ok=True)
             with open(CACHE_PATH, "w", encoding="utf-8") as f:
-                json.dump(groups, f, indent=2, ensure_ascii=False)
-            return groups
+                json.dump(filtered, f, indent=2, ensure_ascii=False)
+            return filtered
         except subprocess.CalledProcessError as err:
             print("⚠️ Could not retrieve groups from DEVONthink:", err)
             return []
@@ -137,13 +156,14 @@ class LabelBoostCLI:
         current = self.boosts.get(label)
         fields = list(current.to_dict().keys())
         updated = current.to_dict()
-        devonthink_groups = self._get_devonthink_groups()  # ✅ always cached list here
+        devonthink_groups = self._get_devonthink_groups()  # ✅ cached or fresh list
 
         print(f"\n🔧 Editing label: {label}\n")
         for field in fields:
             value = updated.get(field)
             default_str = ", ".join(value) if isinstance(value, list) else str(value)
 
+            # ✅ Use autocomplete for DEVONthink groups
             if field == "devonthink_group" and devonthink_groups:
                 answer = questionary.autocomplete(
                     f"{field}",
@@ -155,7 +175,7 @@ class LabelBoostCLI:
                 answer = questionary.text(f"{field}", default=default_str, style=CUSTOM_STYLE).ask()
 
             try:
-                # Convert answer to correct type
+                # ✅ Convert answer to correct type
                 if field == "boost":
                     answer = float(answer)
                 elif field in ("preferred_context", "minimum_parts"):
@@ -170,6 +190,12 @@ class LabelBoostCLI:
             except ValueError as err:
                 print(f"❌ Validation failed for {field}: {err}. Keeping previous value.")
 
+        # ✅ Ensure boost is valid after editing
+        if updated.get("boost", -1.0) < 0.0:
+            print("⚠️ Boost was negative; setting it to 0.0 by default.")
+            updated["boost"] = 0.0
+
+        # ✅ Save updated configuration
         self.boosts.config[label] = LabelConfig.from_dict(updated)
         self.boosts.save()
         print("✅ Saved.")

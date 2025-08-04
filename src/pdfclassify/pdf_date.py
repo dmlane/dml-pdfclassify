@@ -97,29 +97,42 @@ def find_all_dates(
     return results
 
 
+def extract_first_valid_date(
+    fragment: str, languages: list[str], min_parts: list[str]
+) -> Optional[tuple[datetime, str]]:
+    """Return the first valid (datetime, raw) date found in the given text fragment."""
+    for pattern in DATE_REGEXES:
+        for match in re.finditer(pattern, fragment, flags=re.IGNORECASE):
+            raw = match.group()
+            parsed = parse_month_year(raw) or parse(
+                raw,
+                languages=languages,
+                settings={"PREFER_DAY_OF_MONTH": "first", "DATE_ORDER": "DMY"},
+            )
+            if parsed and parsed.year >= 2020 and meets_minimum_parts(parsed, raw, min_parts):
+                return parsed, raw.strip()
+    return None
+
+
 def date_from_context(
     text: str, contexts: list[str], languages: list[str], min_parts: list[str]
 ) -> Optional[tuple[datetime, str]]:
-    for line in text.splitlines():
+    """Find a date that appears on the same line or directly after a context string."""
+    lines = text.splitlines()
+    lower_contexts = [c.lower() for c in contexts]
+
+    for i, line in enumerate(lines):
         ll = line.lower()
-        for ctx in [c.lower() for c in contexts]:
-            pos = ll.find(ctx)
-            if pos == -1:
-                continue
-            for pattern in DATE_REGEXES:
-                for m in re.finditer(pattern, line, flags=re.IGNORECASE):
-                    if m.start() > pos:
-                        parsed = parse_month_year(m.group()) or parse(
-                            m.group(),
-                            languages=languages,
-                            settings={"PREFER_DAY_OF_MONTH": "first", "DATE_ORDER": "DMY"},
-                        )
-                        if (
-                            parsed
-                            and parsed.year >= 2020
-                            and meets_minimum_parts(parsed, m.group(), min_parts)
-                        ):
-                            return parsed, m.group().strip()
+        if any(ctx in ll for ctx in lower_contexts):
+            # Check same line
+            r = extract_first_valid_date(line, languages, min_parts)
+            if r:
+                return r
+            # Check next line (if available)
+            if i + 1 < len(lines):
+                r = extract_first_valid_date(lines[i + 1], languages, min_parts)
+                if r:
+                    return r
     return None
 
 

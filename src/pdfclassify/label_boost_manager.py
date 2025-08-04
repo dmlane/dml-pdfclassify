@@ -60,14 +60,34 @@ class LabelBoostManager:
         return training_labels - self.config.keys()
 
     def sync_with_training_labels(self, interactive: bool = False) -> None:
-        """Ensure all training labels are represented in the config.
+        """Ensure all training labels are represented in the config,
+        remove entries for labels that no longer exist, and save changes."""
+        if not CONFIG.training_data_dir.exists():
+            return
 
-        If `interactive` is True, print additions.
-        """
-        for label in self.missing_labels():
+        training_labels = {p.name for p in CONFIG.training_data_dir.iterdir() if p.is_dir()}
+        modified = False
+
+        # Remove obsolete labels
+        for label in list(self.config.keys()):
+            if label not in training_labels:
+                del self.config[label]
+                modified = True
+                if interactive:
+                    print(f"🗑️ Removed stale config entry: {label}")
+
+        # Add missing labels
+        for label in training_labels - self.config.keys():
             self.config[label] = LabelConfig()
+            modified = True
             if interactive:
                 print(f"➕ Added config entry for training label: {label}")
+
+        # ✅ Save only if changes were made
+        if modified:
+            self.save()
+            if interactive:
+                print("💾 Config updated and saved.")
 
     def is_complete(self, label: str) -> bool:
         """Check if a label's config is complete."""
